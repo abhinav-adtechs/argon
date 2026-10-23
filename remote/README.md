@@ -148,7 +148,7 @@ itself once the connection is back.
 ### The other tabs
 
 - **Home screen** edits the launcher live: the TV picture as a preview; the **wallpaper** (Waves, this hour's top
-  pick, or upload a JPG or PNG, which the TV crops to 1920×1080); the nature-sounds volume; the **Home row** (drag
+  pick, or upload a JPG or PNG, which the TV crops to 1920×1080); the elevator-music volume; the **Home row** (drag
   into order, add or remove apps); the **Welcome hub widgets** (each on or off, small or large; one at least stays
   on); the **football club** (searched across 15 ESPN leagues) and the **weather location** (Open-Meteo, no key;
   empty = Bengaluru); **Lights and plugs**: pairing the Hue Bridge, the plugs' keys, and each one's name and icon (see

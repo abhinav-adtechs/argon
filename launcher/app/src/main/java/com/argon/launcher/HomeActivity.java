@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 // The home screen (HomeView draws all of it). This activity feeds it what the system and the web remote say: the
-// shelf settings, the match, today's viewing, Continue Watching, and keeps the nature sounds in step.
+// shelf settings, the match, today's viewing, Continue Watching, and keeps the elevator music in step.
 public class HomeActivity extends Activity implements HomeView.Host {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();

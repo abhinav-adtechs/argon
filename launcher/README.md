@@ -2,7 +2,7 @@
 
 The TV's home screen (`com.argon.launcher`), styled after the PlayStation 5's home screen and Welcome hub. One Android
 app, Java with no libraries (minSdk 34), that also hosts the [web remote](../remote/README.md)'s server, the viewing
-stats, notices over any app, the nature sounds, the screensaver and the room's lights and plugs.
+stats, notices over any app, the elevator music, the screensaver and the room's lights and plugs.
 
 [![The home screen in motion: moving along the row, app hubs, the Inputs tab](docs/media/home_motion.gif)](docs/media/home_motion.mp4)
 
@@ -44,7 +44,7 @@ it as home and screensaver, and disables the stock launcher and setupwraith (see
 | `java/com/argon/launcher/remote/`    | The web remote's server, in its own `:remote` process: `RemoteService`, `Server`, `Http`, `Auth`, `Adb`, `Mdns` and the Settings, Files, Home screen and stats endpoints (see [the remote docs](../remote/README.md))                                                      |
 | `java/com/argon/launcher/smarthome/` | Philips Hue (`Hue`) and Tuya plugs (`Tuya`, `TuyaCloud`), shared through `SmartHome` and `SmartHomeProvider`                                                                                                                                                               |
 | `res/values/config.xml`              | The defaults you can change by rebuilding (see [Change the defaults](#change-the-defaults-rebuild))                                                                                                                                                                        |
-| `res/raw/ambient_*.ogg`              | The nature loops                                                                                                                                                                                                                                                           |
+| `res/raw/ambient_*.ogg`              | The elevator-music loops                                                                                                                                                                                                                                                   |
 | `assets/`                            | The Inter font and the Material Symbols icons                                                                                                                                                                                                                              |
 
 ## The home screen (on the TV)
@@ -154,10 +154,10 @@ Edit `launcher/app/src/main/res/values/config.xml`, then run `tools/build_instal
   that app's own banner (its tile and All Apps). `banner_com_sonyliv.png` is one: Sony LIV only ships a small square icon on black, so this is
   composed from the app's own "SONY" and "liv" logo artwork.
 
-## Nature sounds
+## Elevator music
 
-A quiet nature loop plays while the home screen is on screen, picked by time of day: morning birdsong (5–12),
-afternoon wind in trees (12–17), evening ocean waves (17–22), night crickets and frogs. Rules, in order of priority:
+A quiet elevator-music loop plays while the home screen is on screen, picked by time of day: Kevin MacLeod's "Local
+Forecast - Elevator" by day (5–17) and a bossa-nova lounge tune at night (17–5). Rules, in order of priority:
 
 - it plays only while home is visible and focused and the screen is on; it waits 1.5 s, then fades in over 4 s;
 - launching anything (an app, Settings, an input) fades it out in 150 ms before the app opens; the decoders are
@@ -168,21 +168,21 @@ afternoon wind in trees (12–17), evening ocean waves (17–22), night crickets
 - the screensaver and standby stop it (home isn't visible then).
 
 Setting in `config.xml` (or the web remote): `ambient_volume` (percentage of the TV volume, default 35; `0` turns
-sounds off). The loops are `launcher/app/src/main/res/raw/ambient_{morning,afternoon,evening,night}.ogg`;
-to swap one, cut a new loop and rebuild, e.g.
-`python3 tools/make_loop.py waves.ogg launcher/app/src/main/res/raw/ambient_evening.ogg 60 120` (start and length in
-seconds; optional 5th argument is the high-pass cut-off in Hz, default 60).
+the music off). The loops are `launcher/app/src/main/res/raw/ambient_{day,night}.ogg`; to swap one, cut a new loop and
+rebuild, e.g. `python3 tools/make_loop.py tune.mp3 launcher/app/src/main/res/raw/ambient_day.ogg 37.25 140.488 30`
+(start and length in seconds; optional 5th argument is the high-pass cut-off in Hz, default 60). For music, start and
+end the loop on the same bar of a repeated section, to the sample, so the cross-fade lands on the beat.
 
-Recordings, all from Wikimedia Commons:
+Tracks:
 
-| Loop      | Recording (section used)                                                                                                                       | Author           | Licence      |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------ |
-| Morning   | [Birdsong morning 01](https://commons.wikimedia.org/wiki/File:Birdsong_morning_01.ogg) (1:50–4:20)                                             | Matutinho        | CC BY-SA 4.0 |
-| Afternoon | [Wind sounds 2020-05-10 1625](https://commons.wikimedia.org/wiki/File:Wind_sounds_2020-05-10_1625.mp3) (5:40–7:40)                             | Robert EA Harvey | CC BY-SA 4.0 |
-| Evening   | [Ocean Waves on a Tropical Beach](https://commons.wikimedia.org/wiki/File:Ocean_Waves_on_a_Tropical_Beach.ogg) (1:00–3:00)                     | J.D. Savanyu     | CC0          |
-| Night     | [Nature sounds ambience in a Dordogne pond](https://commons.wikimedia.org/wiki/File:Nature_sounds_ambience_in_a_Dordogne_pond.ogg) (0:00–0:52) | Glaneur de sons  | CC BY 3.0    |
+| Loop  | Track (section used)                                                                                                 | Author                          | Licence   |
+| ----- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------- |
+| Day   | [Local Forecast - Elevator](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300012) (0:37–2:58)     | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
+| Night | [Which Brand Of Mustard Shall I Buy](https://opengameart.org/content/which-brand-of-mustard-shall-i-buy) (0:17–1:39) | congusbongus                    | CC0       |
 
-Each was high-passed, cross-faded into a 4 s seamless loop and matched to −26 LUFS.
+"Local Forecast - Elevator" by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0
+(http://creativecommons.org/licenses/by/4.0/). Each was high-passed at 30 Hz, cut between two repeats of the same bars,
+cross-faded into a 4 s seamless loop and matched to −26 LUFS.
 
 ## Notices over any app
 
@@ -323,5 +323,5 @@ window and home stays black (`GraphicBufferAllocator: Failed to allocate (1920 x
 launcher once more for that. Apps left running in the background (TV Settings, a streaming app) hold a lot of it:
 `adb shell grep CmaFree /proc/meminfo`.
 
-No frames are drawn while nothing moves. The nature loop costs ~4% of total CPU (decoder + audio server) while it plays
+No frames are drawn while nothing moves. The music loop costs ~4% of total CPU (decoder + audio server) while it plays
 and nothing when home is in the background. Free RAM after debloat: ~590 MB vs ~540 MB before, with ~15 fewer background processes.

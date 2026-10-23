@@ -2018,7 +2018,7 @@ VIEWS.home = {
         max: "100",
         step: "5",
         value: String(H.ambient),
-        "aria-label": "Nature sounds volume",
+        "aria-label": "Elevator music volume",
         oninput: (e) => (amb.textContent = ambText(e.target.value)),
         onchange: async (e) => {
           if (await this.set("ambient_volume", e.target.value))
@@ -2075,7 +2075,7 @@ VIEWS.home = {
       el(
         "div",
         { class: "amb" },
-        el("span", { class: "label", text: "Nature sounds" }),
+        el("span", { class: "label", text: "Elevator music" }),
         slider,
         amb,
       ),

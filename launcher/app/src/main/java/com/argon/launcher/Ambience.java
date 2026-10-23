@@ -16,13 +16,12 @@ import java.io.IOException;
 import java.util.Calendar;
 import java.util.List;
 
-// Quiet nature loop for the home screen. Plays only while home is visible, nothing else is
+// Quiet elevator-music loop for the home screen. Plays only while home is visible, nothing else is
 // playing and we hold audio focus; any doubt resolves to silence.
 final class Ambience implements AudioManager.OnAudioFocusChangeListener {
     private static final String TAG = "Ambience";
     private static final int SETTLE_MS = 1500, FADE_IN_MS = 4000, FADE_OUT_MS = 400, FADE_STEP_MS = 30;
-    private static final int[] TRACKS = {
-            R.raw.ambient_morning, R.raw.ambient_afternoon, R.raw.ambient_evening, R.raw.ambient_night};
+    private static final int[] TRACKS = {R.raw.ambient_day, R.raw.ambient_night};
 
     // CONTENT_TYPE_SONIFICATION + no capture is our signature in the (anonymised) list of active
     // players, so we never count our own loop as "something else is playing".
@@ -189,13 +188,10 @@ final class Ambience implements AudioManager.OnAudioFocusChangeListener {
         fadeTo(1f, FADE_IN_MS);
     }
 
-    // Morning 5–12, afternoon 12–17, evening 17–22, night: an index into TRACKS.
+    // Day 5–17, night: an index into TRACKS.
     private static int period() {
         int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        return hour >= 5 && hour < 12 ? 0
-                : hour >= 12 && hour < 17 ? 1
-                : hour >= 17 && hour < 22 ? 2
-                : 3;
+        return hour >= 5 && hour < 17 ? 0 : 1;
     }
 
     private void pause() {
