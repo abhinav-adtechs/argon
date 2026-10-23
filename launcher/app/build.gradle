@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The TMDB key stays out of the repo: launcher/secrets.properties (gitignored), see the README.
+def secrets = new Properties()
+def secretsFile = rootProject.file('secrets.properties')
+if (secretsFile.exists()) secretsFile.withInputStream { secrets.load(it) }
+
+def remoteAssets = layout.buildDirectory.dir('generated/remote-assets')
+
+android {
+    namespace 'com.argon.launcher'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.argon.launcher'
+        minSdk 34
+        targetSdk 34
+        versionCode 2
+        versionName '2.0'
+        buildConfigField 'String', 'TMDB_KEY', '"' + secrets.getProperty('tmdb_key', '').trim() + '"'
+        buildConfigField 'String', 'TMDB_REGION', '"' + secrets.getProperty('tmdb_region', 'IN').trim() + '"'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            // Debug key: installs over earlier debug builds and keeps the launcher's data.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets.main.assets.srcDir(remoteAssets)
+}
+
+// The web remote's page (remote/public) ships inside the APK; RemoteService serves it from assets/remote.
+def copyRemoteAssets = tasks.register('copyRemoteAssets', Copy) {
+    from rootProject.file('../remote/public')
+    into remoteAssets.map { it.dir('remote') }
+}
+tasks.named('preBuild') { dependsOn copyRemoteAssets }

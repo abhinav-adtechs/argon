@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#02040c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Remote" />
+    <title>Argon Remote</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <svg class="streaks" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="streak" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#2f8cff" stop-opacity="0" />
+            <stop offset="0.5" stop-color="#5cb6ff" stop-opacity="1" />
+            <stop offset="1" stop-color="#d6efff" stop-opacity="0" />
+          </linearGradient>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="1" stop-color="#5aa2ff" />
+          </linearGradient>
+        </defs>
+        <g stroke="url(#streak)">
+          <path d="M-70 880 C 200 720, 470 800, 680 520 S 980 160, 1100 70" />
+          <path d="M-70 894 C 202 735, 474 815, 687 535 S 987 175, 1107 85" />
+          <path d="M-70 908 C 204 750, 478 830, 694 550 S 994 190, 1114 100" />
+        </g>
+      </svg>
+    </div>
+
+    <div class="banner" id="banner" role="alert">
+      <span class="pulse"></span><span id="bannerText">TV not connected</span
+      ><span class="sub" id="bannerSub"></span>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <div class="vol-hud" id="volHud" role="status" aria-live="polite">
+      <span class="vh-ico" id="vhIco"></span>
+      <span class="vh-bar"><i id="vhFill"></i></span>
+      <span class="vh-num" id="vhNum">—</span>
+    </div>
+    <dialog class="sheet" id="confirm">
+      <h2 id="confirmTitle"></h2>
+      <p id="confirmText"></p>
+      <div class="actions">
+        <button class="btn" value="cancel" id="confirmNo">Cancel</button
+        ><button class="btn danger" id="confirmYes">Confirm</button>
+      </div>
+    </dialog>
+    <dialog class="sheet preview" id="preview">
+      <div class="bar">
+        <b id="previewName"></b
+        ><a class="btn small" id="previewDownload" download>Download</a
+        ><button class="btn small icon" id="previewClose" aria-label="Close">
+          <i data-i="x" data-s="18"></i>
+        </button>
+      </div>
+      <div class="body" id="previewBody"></div>
+    </dialog>
+
+    <div class="lsheet" id="lsheet" hidden></div>
+
+    <main class="app" id="app" data-view="remote" data-light="off">
+      <header class="head">
+        <nav class="tabs" id="tabs" aria-label="Sections">
+          <button data-view="remote">Remote</button>
+          <button data-view="home">
+            <span class="long">Home screen</span><span class="short">Home</span>
+          </button>
+          <button data-view="settings">Settings</button>
+          <button data-view="files">Files</button>
+          <button data-view="watch">Watching</button>
+          <button data-view="device">Device</button>
+          <button data-view="admin">Admin</button>
+        </nav>
+        <div class="nowpill" id="nowPill" aria-label="Now on TV">
+          <span class="tile" id="nowPillArt"></span><b id="nowPillName">—</b
+          ><span id="nowPillSub"></span>
+        </div>
+        <div class="mini pillbox" id="mini" aria-label="TV performance"></div>
+        <div class="status pillbox" id="status" role="status">
+          <span class="dot"></span><span class="room">Living room</span
+          ><span class="lat" id="latency">connecting</span>
+        </div>
+        <button class="iconbtn kbd-btn" id="kbdBtn" aria-label="Type on TV">
+          <i data-i="kbd"></i>
+        </button>
+        <button class="iconbtn power" data-hold="POWER" aria-label="Power">
+          <i data-i="power"></i>
+        </button>
+      </header>
+
+      <section class="col-l">
+        <div class="nowcard" id="nowCard" aria-label="Now on TV">
+          <span class="tile" id="nowArt"></span>
+          <div class="nc-text">
+            <span class="label">Now on TV</span><b id="nowTitle">—</b
+            ><span class="nc-sub" id="nowSub"></span>
+          </div>
+        </div>
+
+        <div class="lstrip" id="lstrip" aria-label="Living room"></div>
+        <section
+          class="card living"
+          data-at="side"
+          aria-label="Living room"
+        ></section>
+
+        <section class="card cont" id="cont" aria-label="Continue on TV">
+          <div class="cont-art">
+            <span class="cont-fallback" id="contFallback"></span>
+            <img id="contImg" alt="" hidden />
+            <div class="cont-shade"></div>
+            <div class="cont-app">
+              <span class="tile" id="contAppTile"></span
+              ><span id="contApp"></span>
+            </div>
+            <div class="cont-prog" id="contProg" hidden><i></i></div>
+          </div>
+          <div class="cont-body">
+            <span class="label" id="contLabel">Continue on TV</span>
+            <b class="cont-title" id="contTitle">—</b>
+            <span class="cont-sub" id="contSub"></span>
+          </div>
+          <div class="cont-acts">
+            <button class="btn primary big" id="contResume" hidden>
+              <i data-i="playf" data-s="14"></i>Resume on TV
+            </button>
+            <button
+              class="iconbtn soft"
+              id="contNext"
+              aria-label="Next item"
+              hidden
+            >
+              <i data-i="chev" data-s="16"></i>
+            </button>
+          </div>
+        </section>
+
+        <section class="card volcard" id="volmod" aria-label="Volume">
+          <span class="label">Volume</span>
+          <div class="vc-top">
+            <div class="vc-num">
+              <span id="vmNum">—</span><small id="vmOf">/ 100</small>
+            </div>
+            <div class="vc-btns">
+              <button
+                class="iconbtn soft"
+                data-hold="VOL_DOWN"
+                aria-label="Volume down"
+              >
+                <i data-i="minus"></i>
+              </button>
+              <button
+                class="iconbtn soft mute"
+                data-hold="MUTE"
+                aria-label="Mute"
+              >
+                <i data-i="mute"></i>
+              </button>
+              <button
+                class="iconbtn soft"
+                data-hold="VOL_UP"
+                aria-label="Volume up"
+              >
+                <i data-i="plus"></i>
+              </button>
+            </div>
+          </div>
+          <label class="slider"
+            ><span class="sr">Volume</span
+            ><input
+              type="range"
+              id="volSlider"
+              min="0"
+              max="100"
+              step="1"
+              value="0" /><span class="track"
+              ><span class="fill"></span><span class="thumb"></span></span
+          ></label>
+        </section>
+
+        <section class="card recents" aria-label="Last presses">
+          <span class="label">Last presses</span>
+          <div class="chips" id="recent">
+            <span class="hint">Keys you press show up here</span>
+          </div>
+        </section>
+      </section>
+
+      <section class="col-c">
+        <section class="card tvcard" aria-label="On the TV">
+          <div class="tv-head">
+            <span class="label">On the TV</span
+            ><span class="live-badge off" id="liveBadge"><i></i>LIVE</span
+            ><span class="ctrl-chip" id="ctrlChip" hidden
+              ><i data-i="gamepad" data-s="18"></i>Controller connected</span
+            >
+          </div>
+          <div class="mirror-wrap">
+            <div
+              class="mirror"
+              id="mirror"
+              role="application"
+              aria-label="Live picture of the TV. Arrow keys move the focus; click for OK, drag to swipe"
+            >
+              <img
+                id="mirrorImg"
+                alt="The TV screen right now"
+                draggable="false"
+              />
+              <canvas></canvas>
+              <span class="lightbar"></span>
+              <div class="keychip"></div>
+              <div class="mirror-note" id="mirrorNote">
+                Loading the TV picture…
+              </div>
+            </div>
+          </div>
+          <div class="tv-tools">
+            <span class="hint">Refreshes after every key</span>
+            <button class="btn small soft" id="shotBtn">
+              <i data-i="download" data-s="16"></i>Screenshot</button
+            ><button class="btn small soft" id="fullBtn">
+              <i data-i="full" data-s="16"></i>Full screen
+            </button>
+          </div>
+
+          <div
+            class="pad"
+            id="pad"
+            role="application"
+            aria-label="Touch surface. Swipe to move, tap for OK, hold for Options"
+          >
+            <canvas></canvas>
+            <span class="lightbar"></span>
+            <div class="keychip"></div>
+            <div class="hint">
+              Swipe to move · Tap for OK · Hold for Options
+            </div>
+          </div>
+
+          <div class="tv-keys">
+            <button class="act primary" data-hold="OK" aria-label="OK">
+              <i data-i="cross"></i><b>OK</b><kbd>⏎</kbd>
+            </button>
+            <button class="act" data-hold="BACK" aria-label="Back">
+              <i data-i="circle"></i><b>Back</b><kbd>esc</kbd>
+            </button>
+            <button
+              class="act"
+              data-hold="PLAY_PAUSE"
+              aria-label="Play or pause"
+            >
+              <i data-i="square"></i><b>Play / Pause</b><kbd>space</kbd>
+            </button>
+            <button class="act" data-hold="MENU" aria-label="Menu">
+              <i data-i="triangle"></i><b>Menu</b><kbd>.</kbd>
+            </button>
+          </div>
+          <div class="tv-home">
+            <button class="pill" data-hold="HOME" aria-label="Home">
+              <i data-i="home"></i>Home<kbd>H</kbd>
+            </button>
+            <div class="hints">
+              <span><kbd>←↑↓→</kbd>Move</span><span><kbd>[ ]</kbd>Volume</span
+              ><span><kbd>M</kbd>Mute</span>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="card living"
+          data-at="center"
+          aria-label="Living room"
+        ></section>
+
+        <div class="phone-keys">
+          <div class="pk-row">
+            <button class="cbtn" data-hold="BACK" aria-label="Back">
+              <i data-i="circle"></i><span>Back</span>
+            </button>
+            <button class="cbtn ok" data-hold="OK" aria-label="OK">
+              <i data-i="cross"></i><span>OK</span>
+            </button>
+            <button
+              class="cbtn"
+              data-hold="PLAY_PAUSE"
+              aria-label="Play or pause"
+            >
+              <i data-i="square"></i><span>Play</span>
+            </button>
+          </div>
+          <div class="pk-pills">
+            <button class="pill" data-hold="HOME" aria-label="Home">
+              <i data-i="home"></i>Home
+            </button>
+            <button class="pill" data-hold="MENU" aria-label="Menu">
+              <i data-i="triangle"></i>Menu
+            </button>
+            <button class="pill" data-focus="type" aria-label="Type on TV">
+              <i data-i="kbd"></i>Type
+            </button>
+          </div>
+        </div>
+
+        <div class="arc">
+          <button class="cbtn a-menu" data-hold="MENU" aria-label="Menu">
+            <i data-i="triangle"></i><span>Menu</span>
+          </button>
+          <button
+            class="cbtn a-play"
+            data-hold="PLAY_PAUSE"
+            aria-label="Play or pause"
+          >
+            <i data-i="square"></i><span>Play</span>
+          </button>
+          <button class="cbtn a-back" data-hold="BACK" aria-label="Back">
+            <i data-i="circle"></i><span>Back</span>
+          </button>
+          <button class="cbtn a-home" data-hold="HOME" aria-label="Home">
+            <i data-i="home"></i><span>Home</span>
+          </button>
+          <button class="cbtn ok a-ok" data-hold="OK" aria-label="OK">
+            <i data-i="cross"></i><span>OK</span>
+          </button>
+        </div>
+
+        <div class="typebar" id="typebar" data-tmode="type">
+          <div class="tmode" role="group" aria-label="What the text does">
+            <button data-tmode="type" class="on" aria-pressed="true">
+              <i data-i="kbd" data-s="15"></i><span>Type</span></button
+            ><button data-tmode="notice" aria-pressed="false">
+              <i data-i="bell" data-s="15"></i><span>Notice</span>
+            </button>
+          </div>
+          <label class="sr" for="type">Type on TV</label>
+          <input
+            id="type"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="search"
+            placeholder="Type into the TV's search box"
+          />
+          <span class="typehint"><kbd>/</kbd> to focus</span>
+          <button class="done" id="typeDone">Done</button>
+        </div>
+      </section>
+
+      <section class="col-r">
+        <section class="card apps" aria-label="Open app">
+          <div class="card-head">
+            <span class="label">Open app</span
+            ><span class="hint" id="appsHint"></span>
+          </div>
+          <div class="appgrid" id="tiles"></div>
+        </section>
+        <section class="card inputs" aria-label="Input">
+          <span class="label">Input</span>
+          <div class="rings" id="inputs"></div>
+        </section>
+        <section
+          class="card watchcard"
+          id="watchCard"
+          aria-label="Watching today"
+          hidden
+        >
+          <div class="card-head">
+            <span class="label">Watching today</span
+            ><a class="more" href="#watch">All stats ›</a>
+          </div>
+          <div class="wc-total">
+            <span id="wcTotal">—</span><small id="wcScreen"></small>
+          </div>
+          <div class="wc-split" id="wcSplit" aria-hidden="true"></div>
+          <div class="wc-top" id="wcTop"></div>
+        </section>
+
+        <div class="dock" id="dock" aria-label="Apps"></div>
+        <div class="volrow">
+          <div class="volpill">
+            <button data-hold="VOL_DOWN" aria-label="Volume down">
+              <i data-i="minus"></i></button
+            ><span class="vp-bar" aria-hidden="true"><i id="vpFill"></i></span
+            ><b id="volNum">—</b
+            ><button data-hold="VOL_UP" aria-label="Volume up">
+              <i data-i="plus"></i>
+            </button>
+          </div>
+          <button class="iconbtn mute" data-hold="MUTE" aria-label="Mute">
+            <i data-i="mute" data-s="22"></i>
+          </button>
+        </div>
+        <div class="vcol">
+          <div
+            class="vslider"
+            id="vslider"
+            role="slider"
+            aria-label="Volume"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          >
+            <span class="vs-fill"></span>
+            <button class="vs-up" data-hold="VOL_UP" aria-label="Volume up">
+              <i data-i="plus" data-s="14"></i>
+            </button>
+            <button
+              class="vs-down"
+              data-hold="VOL_DOWN"
+              aria-label="Volume down"
+            >
+              <i data-i="minus" data-s="14"></i>
+            </button>
+          </div>
+          <b class="vs-num" id="vsNum">—</b>
+          <button class="iconbtn mute" data-hold="MUTE" aria-label="Mute">
+            <i data-i="mute" data-s="15"></i>
+          </button>
+        </div>
+      </section>
+
+      <section class="page" id="page">
+        <div class="view" id="view-home"></div>
+        <div class="view" id="view-settings"></div>
+        <div class="view" id="view-files"></div>
+        <div class="view" id="view-watch"></div>
+        <div class="view" id="view-device"></div>
+        <div class="view" id="view-admin"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+    <script src="views.js"></script>
+  </body>
+</html>

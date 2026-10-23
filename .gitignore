@@ -1,0 +1,21 @@
+# Build output and this machine's SDK path (launcher/.gitignore covers the Gradle project too)
+launcher/.gradle/
+launcher/build/
+launcher/app/build/
+launcher/local.properties
+
+# The TMDB key (see launcher/README.md)
+launcher/secrets.properties
+
+# Device snapshot from before any change (serial numbers, settings, removed files); only the disabled list is kept
+backup/*
+!backup/disabled_by_tools.txt
+
+# Working files: raw captures from the TV, design mock-ups, the promo's sources, the remote's dev cache
+shots/
+design/
+promo/
+remote/.cache/
+.claude/
+
+.DS_Store

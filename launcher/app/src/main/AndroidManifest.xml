@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Continue watching / Recommended: read apps' programs from the TV provider, fetch their artwork. -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Notices over any app; granted by tools/build_install.sh with appops (no settings screen on TV). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Viewing stats: app and screen time from usage events; granted with appops by tools/build_install.sh. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- The web remote (remote/RemoteService): a foreground service, and argon.local over multicast DNS. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Launcher">
+        <activity
+            android:name=".HomeActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resumeWhilePausing="true"
+            android:screenOrientation="landscape"
+            android:stateNotNeeded="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Only the shell (adb) and root hold DUMP, so other apps on the TV can't post notices. -->
+        <receiver
+            android:name=".NoticeReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="com.argon.launcher.NOTICE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The web remote, served from the TV on port 7777; its own process keeps it small and alive
+             when the home screen is not. -->
+        <service
+            android:name=".remote.RemoteService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:process=":remote">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Web remote control server for this TV on the local network" />
+        </service>
+
+        <!-- The lights and plugs (smarthome/SmartHome), for the home screen; in the remote's process, where their
+             connections are, and only for this app. -->
+        <provider
+            android:name=".smarthome.SmartHomeProvider"
+            android:authorities="com.argon.launcher.smarthome"
+            android:exported="false"
+            android:process=":remote" />
+
+        <!-- The web remote reads and changes home screen settings through `am broadcast`; shell only, as above. -->
+        <receiver
+            android:name=".ControlReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="com.argon.launcher.CONTROL" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".StatsActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- The screensaver: TMDB pick photos with a glass clock; set by tools/build_install.sh. -->
+        <service
+            android:name=".Screensaver"
+            android:exported="true"
+            android:label="Argon"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <!-- Titles of what's playing, from media sessions; enabled with `cmd notification allow_listener`. -->
+        <service
+            android:name=".MediaListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Viewing stats as JSON for the web remote; shell only, like the receivers above. -->
+        <provider
+            android:name=".StatsProvider"
+            android:authorities="com.argon.launcher.stats"
+            android:exported="true"
+            android:readPermission="android.permission.DUMP"
+            android:writePermission="android.permission.DUMP" />
+
+        <!-- Wallpapers sent from the web remote and the stats database, for adb; shell only, as above. -->
+        <provider
+            android:name=".FilesProvider"
+            android:authorities="com.argon.launcher.files"
+            android:exported="true"
+            android:readPermission="android.permission.DUMP"
+            android:writePermission="android.permission.DUMP" />
+    </application>
+</manifest>

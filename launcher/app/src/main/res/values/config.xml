@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Starting shelf apps, left to right (package names). After that the shelf is edited on the TV
+         (hold OK on an app, or Add to Shelf in All Apps); changing this list and rebuilding resets it. -->
+    <string-array name="dock_packages" translatable="false">
+        <item>com.google.android.youtube.tv</item>
+        <item>com.netflix.ninja</item>
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>in.startv.hotstar</item>
+        <item>com.sonyliv</item>
+    </string-array>
+
+    <!-- Nature sounds on the home screen, as a percentage of the TV volume. 0 = off.
+         Tracks are res/raw/ambient_{morning,afternoon,evening,night}.ogg. -->
+    <integer name="ambient_volume">35</integer>
+
+    <!-- Football chip on the tab row and match card in the drawer: ESPN team id, the number in the club's
+         espn.com address (Manchester City = 382). Empty = neither. -->
+    <string name="football_team" translatable="false">382</string>
+
+    <!-- App opened by "Live TV" in the drawer. -->
+    <string name="live_tv_package" translatable="false">com.mitv.livetv</string>
+</resources>

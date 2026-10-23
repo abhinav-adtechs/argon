@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#02040c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Remote" />
+    <title>Argon Remote</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="app.css" />
+    <style>
+      body {
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <svg class="streaks" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="streak" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#2f8cff" stop-opacity="0" />
+            <stop offset="0.5" stop-color="#5cb6ff" stop-opacity="1" />
+            <stop offset="1" stop-color="#d6efff" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <g stroke="url(#streak)">
+          <path d="M-70 880 C 200 720, 470 800, 680 520 S 980 160, 1100 70" />
+          <path d="M-70 894 C 202 735, 474 815, 687 535 S 987 175, 1107 85" />
+          <path d="M-70 908 C 204 750, 478 830, 694 550 S 994 190, 1114 100" />
+        </g>
+      </svg>
+    </div>
+
+    <main class="gate">
+      <div class="cardx">
+        <div class="mark" aria-hidden="true">
+          <svg
+            viewBox="0 0 84 84"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="20" cy="20" r="14" />
+            <path d="M64 6 79 33H49z" />
+            <path d="M8 52l24 24M32 52 8 76" />
+            <rect x="50" y="50" width="28" height="28" rx="3" />
+          </svg>
+        </div>
+        <h1 id="title">Argon Remote</h1>
+        <p id="lead">Checking…</p>
+
+        <form id="form" hidden>
+          <label id="codeRow" hidden
+            >Code on the TV
+            <input
+              class="field"
+              id="code"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+          /></label>
+          <label
+            >Password
+            <input
+              class="field"
+              id="password"
+              type="password"
+              autocomplete="current-password"
+              required
+          /></label>
+          <label id="confirmRow" hidden
+            >Type it again
+            <input
+              class="field"
+              id="confirm"
+              type="password"
+              autocomplete="new-password"
+          /></label>
+          <label
+            >Name for this device
+            <input
+              class="field"
+              id="device"
+              maxlength="40"
+              autocomplete="off"
+              spellcheck="false"
+          /></label>
+          <p class="err" id="err" role="alert"></p>
+          <button class="btn primary" id="go" type="submit">Sign in</button>
+        </form>
+
+        <button class="btn" id="retry" type="button" hidden>Check again</button>
+        <button class="btn" id="forgot" type="button" hidden>
+          Forgot the password?
+        </button>
+      </div>
+    </main>
+
+    <script>
+      "use strict";
+      const $ = (s) => document.querySelector(s);
+      let mode = "login";
+
+      async function load() {
+        const s = await fetch("/api/auth/status").then((r) => r.json());
+        if (s.signedIn) return location.replace("/");
+        $("#device").value = s.device;
+        if (s.setUp) {
+          mode = "login";
+          $("#title").textContent = "Sign in";
+          $("#lead").textContent =
+            "Enter the remote's password to control the TV from this device.";
+          show(true);
+          $("#forgot").hidden = false;
+          $("#password").focus();
+        } else setup(false);
+      }
+      // Creating or resetting the password takes the code the TV shows, so it needs someone in the room.
+      async function setup(reset) {
+        mode = "setup";
+        $("#title").textContent = reset
+          ? "Reset the password"
+          : "Create a password";
+        $("#lead").textContent =
+          (reset
+            ? "This signs every device out. "
+            : "Every phone, tablet and laptop will need it to use the remote. ") +
+          "Enter the code now on the TV, then a new password of at least 6 characters.";
+        $("#codeRow").hidden = false;
+        $("#code").required = true;
+        $("#password").autocomplete = "new-password";
+        $("#confirmRow").hidden = false;
+        $("#confirm").required = true;
+        $("#go").textContent = "Set password";
+        $("#forgot").hidden = true;
+        show(true);
+        $("#code").focus();
+        await fetch("/api/auth/code", { method: "POST" });
+      }
+      function show(form) {
+        $("#form").hidden = !form;
+        $("#retry").hidden = form;
+      }
+
+      $("#form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const password = $("#password").value;
+        if (mode === "setup" && password !== $("#confirm").value) {
+          $("#err").textContent = "The two passwords don't match";
+          return;
+        }
+        $("#go").disabled = true;
+        $("#err").textContent = "";
+        const r = await fetch(
+          mode === "setup" ? "/api/auth/setup" : "/api/auth/login",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              password,
+              device: $("#device").value,
+              code: $("#code").value,
+            }),
+          },
+        )
+          .then((r) => r.json())
+          .catch(() => ({ ok: false, error: "Can't reach the remote server" }));
+        $("#go").disabled = false;
+        if (r.ok) return location.replace("/");
+        $("#err").textContent = r.error || "That didn't work";
+        $("#password").select();
+      });
+      $("#retry").addEventListener("click", load);
+      $("#forgot").addEventListener("click", () => setup(true));
+      load().catch(() => {
+        $("#lead").textContent = "Can't reach the remote server.";
+        show(false);
+      });
+    </script>
+  </body>
+</html>
