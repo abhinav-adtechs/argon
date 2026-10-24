@@ -31,6 +31,7 @@ tablet or laptop on the Wi-Fi.
 | `tools/disable.sh pkg…`                               | Disables packages one `pm` call at a time and logs them for restore; persistent packages are uninstalled for user 0 instead (the system starts them even when disabled). |
 | `tools/notice.sh [-t title] [-s secs] text`           | Shows a notice card on the TV, on top of whatever app is open (see [Notices](launcher/README.md#notices-over-any-app)).                                                  |
 | `tools/shot.sh name [KEY…]`                           | Presses remote keys over ADB (`DPAD_DOWN`, `HOME`, `BACK`…) and saves `shots/name.png`.                                                                                  |
+| `tools/wake.sh [secs]`                                | Turns the TV on from standby over ADB, retrying while it naps (needs Screenless mode, see [Waking the TV](#waking-the-tv-from-a-laptop)).                                |
 | `tools/make_symbols.py font.ttf font.codepoints out/` | Renders the home screen's icons (white PNGs in `assets/symbols`) from the Material Symbols Rounded font (needs `Pillow`).                                                |
 | `tools/make_loop.py in out.ogg start len`             | Cuts a seamless, loudness-matched loop from a recording or a song (needs `numpy`, `scipy`, `soundfile`, `ffmpeg`).                                                       |
 
@@ -120,6 +121,38 @@ protected package and shell can't disable it.
 
 To measure a boot yourself: `adb reboot`, wait, then
 `adb logcat -b events -d | grep -E "boot_progress|sf_stop_bootanim|wm_activity_launch_time|am_proc_start"`.
+
+## Waking the TV from a laptop
+
+The web remote is served by the TV, so it's gone once the TV is off. Out of the box, standby here is a full shutdown:
+suspend-to-RAM is off in this firmware (`persist.vendor.mitv.str.framework=false`), so the Wi-Fi goes off with
+everything else and only the Bluetooth stays up, listening for the paired remote. Wake-on-LAN magic packets don't wake
+it in any energy mode.
+
+Two settings keep it on the network while it's asleep:
+
+1. **Settings › System › Power & Energy › Power › Screenless mode:** on. In standby the TV keeps running with the
+   screen off for up to 3 hours, then sleeps for real. (It's there for AirPlay and HomeKit, but works with the AirPlay
+   packages uninstalled.)
+2. **Settings › System › Power & Energy › Energy Modes:** **Optimized** (networked standby). Increased works too;
+   on Low the TV still shuts down.
+
+Then `tools/wake.sh` turns it on with `KEYCODE_WAKEUP` over ADB. Asleep, the TV drops off the Wi-Fi for seconds at a
+time, so the script reconnects and retries until the TV reports it's awake (under a minute in testing; it gives up
+after 90 s, or the seconds you pass).
+
+| Screenless mode | Energy mode | After 1.5–2 min in standby       |
+| --------------- | ----------- | -------------------------------- |
+| off             | Increased   | Shut down, nothing wakes it      |
+| on              | Low         | Shut down, nothing wakes it      |
+| on              | Optimized   | Woken by `tools/wake.sh`         |
+| on              | Increased   | Woken by `input keyevent WAKEUP` |
+
+The web remote keeps running through those 3 hours too, and its power button turns the TV on (see
+[While the TV is off](remote/README.md#how-it-works)).
+
+Not yet tested: whether the TV can still be woken after the 3 hours are up. If `tools/wake.sh` gives up, the TV is
+fully off and only the remote or the TV's own button turns it on.
 
 ## Re-enable an app
 

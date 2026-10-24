@@ -374,6 +374,7 @@ on.state = (m) => {
   const kbdOpened = m.kbd && !S.kbd;
   const kbdClosed = !m.kbd && S.kbd;
   S = m;
+  sendWaitingPower();
   if (volChanged) showVolumeHud();
   if (appsChanged) buildApps();
   if (inputsChanged) buildInputs();
@@ -400,14 +401,36 @@ function buzz(ms = 8) {
   } catch {}
 }
 
+// Asleep in Screenless mode, the TV drops off the Wi-Fi for seconds at a time. A power press
+// then waits here and goes out as one tap (holding POWER opens the TV's power menu) as soon as
+// the TV is back; after a minute it's forgotten.
+let waitingPower = 0;
+function waitPower() {
+  waitingPower = performance.now();
+  renderStatus();
+}
+function sendWaitingPower() {
+  if (!waitingPower || !open() || !S.connected) return;
+  const fresh = performance.now() - waitingPower < 60000;
+  waitingPower = 0;
+  if (fresh) {
+    const id = track("POWER", KEY_LABEL.POWER);
+    noteKey("POWER", id);
+    send({ t: "tap", k: "POWER", id });
+  }
+  renderStatus();
+}
+
 function tap(k) {
   buzz();
+  if (k === "POWER" && !(open() && S.connected)) return waitPower();
   const id = track(k, KEY_LABEL[k] ?? k);
   noteKey(k, id);
   send({ t: "tap", k, id });
 }
 function down(k) {
   buzz();
+  if (k === "POWER" && !(open() && S.connected)) return waitPower();
   if (k === "VOL_UP" || k === "VOL_DOWN" || k === "MUTE") showVolumeHud();
   const id = track(k, KEY_LABEL[k] ?? k);
   noteKey(k, id);
@@ -1754,9 +1777,11 @@ function renderStatus() {
   $("#bannerText").textContent = open()
     ? "TV not connected"
     : "Can't reach the TV";
-  $("#bannerSub").textContent = open()
-    ? `retrying ${S.address || ""}`
-    : "retrying";
+  $("#bannerSub").textContent = waitingPower
+    ? "power goes through when it answers"
+    : open()
+      ? `retrying ${S.address || ""}`
+      : "retrying";
   if (!bannerTimer && !$("#banner").classList.contains("show")) {
     bannerTimer = setTimeout(() => {
       bannerTimer = 0;

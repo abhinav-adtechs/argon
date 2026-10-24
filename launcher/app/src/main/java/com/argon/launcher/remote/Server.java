@@ -105,6 +105,8 @@ final class Server {
     // What the sign-in page needs, plus the icons a phone fetches when adding the page to its home screen.
     private static final Set<String> PUBLIC_FILES = Set.of("/login.html", "/app.css", "/manifest.webmanifest",
             "/icon-180.png", "/icon-192.png", "/icon-512.png");
+    // The page's own stylesheet and scripts, as the HTML links them (see file()).
+    private static final Pattern ASSET_LINK = Pattern.compile("(href|src)=\"(app\\.css|app\\.js|views\\.js)\"");
 
     private static final String VOLUME_CMD = "cmd media_session volume --stream 3 --get | grep 'volume is'; "
             + "dumpsys audio | grep -A1 '^- STREAM_MUSIC:' | head -2";
@@ -144,6 +146,8 @@ final class Server {
     // The TV picture (one screencap at a time, shared by pages asking within 400 ms), Continue Watching as the
     // pages last saw it (resume and art go by index), and its art made small.
     private final Context context;
+    // Changes with every install of the APK; the page's assets are linked with it (see file()).
+    private final String version;
     private final TvInputManager tvInputs;
     private final Object screenLock = new Object();
     private byte[] screenJpeg;
@@ -173,6 +177,7 @@ final class Server {
     Server(Context context, Link link, File dataDir, Assets assets, int port, Consumer<String> log) throws IOException {
         this.context = context;
         this.link = link;
+        version = Long.toString(new File(context.getPackageCodePath()).lastModified(), 36);
         tvInputs = context.getSystemService(TvInputManager.class);
         // An HDMI device switched on or unplugged changes the page's input rings.
         tvInputs.registerCallback(new TvInputManager.TvInputCallback() {
@@ -687,7 +692,13 @@ final class Server {
             return;
         }
         String ext = path.substring(path.lastIndexOf('.') + 1);
-        req.send(200, MIME.getOrDefault(ext, "application/octet-stream"), body, "Cache-Control", "no-cache");
+        // Asleep in Screenless mode, the TV is off the Wi-Fi for seconds at a time and any request can hit
+        // that. Pages link their CSS and scripts with ?v=<install>, so a browser keeps those until the next
+        // install and opening the remote needs only the page itself.
+        if (ext.equals("html")) body = ASSET_LINK.matcher(new String(body, StandardCharsets.UTF_8))
+                .replaceAll("$1=\"$2?v=" + version + "\"").getBytes(StandardCharsets.UTF_8);
+        String cache = req.query.startsWith("v=") ? "max-age=31536000, immutable" : "no-cache";
+        req.send(200, MIME.getOrDefault(ext, "application/octet-stream"), body, "Cache-Control", cache);
     }
 
     /* ---------- The TV picture, Continue Watching art, the wallpaper ---------- */

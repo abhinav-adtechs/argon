@@ -71,6 +71,18 @@ responder (`Mdns.java`), so it follows the TV when the router gives it a new add
 Neither the router nor a Mac is a good host: the router (D-Link DIR-825ACG1: Realtek Lexra chip, 64 MB RAM, stock
 firmware) can't run it, and a Mac only serves it while it's awake and on this Wi-Fi.
 
+**While the TV is off.** With Screenless mode on (see [Waking the TV](../README.md#waking-the-tv-from-a-laptop)),
+the remote keeps running for the first 3 hours of standby, so its power button turns the TV back on. Asleep, the TV
+drops off the Wi-Fi for seconds at a time (it answered about 75% of requests in testing), so:
+
+- The server links the page's CSS and scripts with `?v=<install>` and lets browsers keep them for good; a new install
+  changes the links. Opening the remote then needs only the page itself, and the browser waits out a nap rather than
+  failing (one load took 14 s). It can't open with the TV fully off: caching the page itself needs a service worker,
+  which browsers allow only over HTTPS.
+- A power press while the page can't reach the TV waits (the banner says so) and goes out as one tap as soon as the
+  TV is back, for up to a minute. A connection that went quiet mid-nap still shows as live; a press sent on it waits
+  in the network until the TV wakes and arrives then.
+
 **Password.** Every page, API call and the live connection need a sign-in. The first time, the page asks for a
 6-digit code that the TV shows as a notice (valid 5 minutes, five tries) and then the password (at least 6
 characters), so only someone in the room can set it. **Forgot the password?** on the sign-in page does the same and
