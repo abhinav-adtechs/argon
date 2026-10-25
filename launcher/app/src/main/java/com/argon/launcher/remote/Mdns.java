@@ -16,25 +16,39 @@ import java.util.function.Consumer;
 // http://argon.local:7777 and keep it when the router hands the TV a new address.
 final class Mdns {
     static final String NAME = "argon.local";
-    private static final int PORT = 5353, TTL = 120;
+    private static final int PORT = 5353, TTL = 120, RETRY_MS = 5000;
     private static final InetAddress GROUP = group();
 
-    private final MulticastSocket socket;
+    private MulticastSocket socket;
 
-    Mdns(Consumer<String> log) throws IOException {
-        socket = new MulticastSocket(PORT);
-        socket.joinGroup(new InetSocketAddress(GROUP, PORT), null);
+    // The group has no route until Wi-Fi is the default network: at boot the service starts ~30 s before
+    // it, and naps drop it for seconds. Joining fails then ("No such device"), and so can a send, so the
+    // socket is rebuilt until it works rather than giving up on argon.local for good.
+    Mdns(Consumer<String> log) {
         Thread t = new Thread(() -> {
-            try {
-                announce();
-                byte[] buf = new byte[9000];
-                while (true) {
-                    DatagramPacket p = new DatagramPacket(buf, buf.length);
-                    socket.receive(p);
-                    answer(p);
+            String last = null;
+            while (true) {
+                try (MulticastSocket s = new MulticastSocket(PORT)) {
+                    s.joinGroup(new InetSocketAddress(GROUP, PORT), null);
+                    socket = s;
+                    last = null;
+                    announce();
+                    byte[] buf = new byte[9000];
+                    while (true) {
+                        DatagramPacket p = new DatagramPacket(buf, buf.length);
+                        s.receive(p);
+                        answer(p);
+                    }
+                } catch (IOException e) {
+                    // Once per outage, not every retry.
+                    if (!e.toString().equals(last)) log.accept("mdns: " + e);
+                    last = e.toString();
                 }
-            } catch (IOException e) {
-                log.accept("mdns: " + e);
+                try {
+                    Thread.sleep(RETRY_MS);
+                } catch (InterruptedException e) {
+                    return;
+                }
             }
         }, "mdns");
         t.setDaemon(true);
