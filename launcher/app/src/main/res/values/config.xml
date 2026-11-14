@@ -10,9 +10,17 @@
         <item>com.sonyliv</item>
     </string-array>
 
-    <!-- Football chip on the tab row and match card in the drawer: ESPN team id, the number in the club's
-         espn.com address (Manchester City = 382). Empty = neither. -->
+    <!-- The club for Football Central, the screensaver's panel, the LIVE pill and the match widget: ESPN team id, the
+         number in the club's espn.com address (Manchester City = 382). Empty = none of them. -->
     <string name="football_team" translatable="false">382</string>
+
+    <!-- Football Central's "Watch on" button, from three hours before kick-off to the final whistle: the app that
+         shows each competition here (ESPN league slug|package), when it's installed. India: the Premier League on
+         JioHotstar, the Champions League on Sony LIV. -->
+    <string-array name="football_watch" translatable="false">
+        <item>eng.1|in.startv.hotstar</item>
+        <item>uefa.champions|com.sonyliv</item>
+    </string-array>
 
     <!-- App opened by "Live TV" in the drawer. -->
     <string name="live_tv_package" translatable="false">com.mitv.livetv</string>

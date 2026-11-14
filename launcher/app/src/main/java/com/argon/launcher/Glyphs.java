@@ -272,6 +272,67 @@ final class Glyphs {
                 PATH.lineTo(8.1f, 7.6f);
                 c.drawPath(PATH, STROKE);
                 break;
+            // Football Central.
+            case "news":
+                STROKE.setStrokeWidth(1.8f);
+                c.drawRoundRect(3, 4, 21, 20, 2, 2, STROKE);
+                c.drawRect(6.5f, 7.5f, 11.5f, 12, FILL);
+                c.drawLine(14, 8, 17.5f, 8, STROKE);
+                c.drawLine(14, 11.5f, 17.5f, 11.5f, STROKE);
+                c.drawLine(6.5f, 16, 17.5f, 16, STROKE);
+                break;
+            case "swap":
+                STROKE.setStrokeWidth(2);
+                c.drawLine(4, 8, 19, 8, STROKE);
+                PATH.moveTo(15.5f, 4.5f);
+                PATH.lineTo(19, 8);
+                PATH.lineTo(15.5f, 11.5f);
+                c.drawLine(20, 16, 5, 16, STROKE);
+                PATH.moveTo(8.5f, 12.5f);
+                PATH.lineTo(5, 16);
+                PATH.lineTo(8.5f, 19.5f);
+                c.drawPath(PATH, STROKE);
+                break;
+            case "trophy":
+                STROKE.setStrokeWidth(1.8f);
+                PATH.moveTo(7, 3.5f);
+                PATH.lineTo(17, 3.5f);
+                PATH.lineTo(17, 9);
+                PATH.cubicTo(17, 12.2f, 14.8f, 14.5f, 12, 14.5f);
+                PATH.cubicTo(9.2f, 14.5f, 7, 12.2f, 7, 9);
+                PATH.close();
+                c.drawPath(PATH, STROKE);
+                PATH.reset();
+                PATH.moveTo(7, 5.5f);
+                PATH.cubicTo(3.5f, 5.5f, 3.5f, 10.5f, 7.6f, 11);
+                PATH.moveTo(17, 5.5f);
+                PATH.cubicTo(20.5f, 5.5f, 20.5f, 10.5f, 16.4f, 11);
+                c.drawPath(PATH, STROKE);
+                c.drawLine(12, 14.5f, 12, 18.5f, STROKE);
+                c.drawRoundRect(8, 18.5f, 16, 21, 1, 1, STROKE);
+                break;
+            case "calendar":
+                STROKE.setStrokeWidth(1.8f);
+                c.drawRoundRect(3.5f, 5, 20.5f, 20.5f, 2.2f, 2.2f, STROKE);
+                c.drawLine(3.5f, 9.5f, 20.5f, 9.5f, STROKE);
+                c.drawLine(8, 3, 8, 6.5f, STROKE);
+                c.drawLine(16, 3, 16, 6.5f, STROKE);
+                for (int i = 0; i < 6; i++) c.drawCircle(7.7f + (i % 3) * 4.3f, 13 + (i / 3) * 4, 1.1f, FILL);
+                break;
+            case "table":
+                STROKE.setStrokeWidth(1.8f);
+                for (int i = 0; i < 4; i++) {
+                    float y = 5 + i * 4.7f;
+                    c.drawCircle(4.5f, y, 1.2f, FILL);
+                    c.drawLine(8, y, i == 1 ? 20 : 17, y, STROKE);
+                }
+                break;
+            case "form":
+                for (int i = 0; i < 4; i++) {
+                    float hgt = 5 + i * 4;
+                    c.drawRoundRect(3.5f + i * 4.6f, 20 - hgt, 6.7f + i * 4.6f, 20, 1, 1, FILL);
+                }
+                break;
             default:
                 break;
         }
