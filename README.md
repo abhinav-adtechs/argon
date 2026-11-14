@@ -34,7 +34,7 @@ tablet or laptop on the Wi-Fi.
 | `tools/wake.sh [secs]`                                | Turns the TV on from standby over ADB, retrying while it naps (needs Screenless mode, see [Waking the TV](#waking-the-tv-from-a-laptop)).                                |
 | `tools/make_symbols.py font.ttf font.codepoints out/` | Renders the home screen's icons (white PNGs in `assets/symbols`) from the Material Symbols Rounded font (needs `Pillow`).                                                |
 
-All scripts read the TV address from `TV` (default `192.168.2.13:5555`): `TV=192.168.2.50:5555 tools/restore.sh`.
+All scripts read the TV address from `TV` (default `192.168.2.14:5555`): `TV=192.168.2.50:5555 tools/restore.sh`.
 
 ## Quick start
 
@@ -47,8 +47,8 @@ All scripts read the TV address from `TV` (default `192.168.2.13:5555`): `TV=192
 
    ```bash
    git clone https://github.com/abhinav-adtechs/argon.git && cd argon
-   adb connect 192.168.2.13:5555
-   TV=192.168.2.13:5555 tools/build_install.sh
+   adb connect 192.168.2.14:5555
+   TV=192.168.2.14:5555 tools/build_install.sh
    ```
 
    Accept **Allow USB debugging?** on the TV (tick **Always allow**). It asks a second time once the launcher's web
@@ -62,7 +62,7 @@ brings back the stock Google TV home.
 
 ## The TV
 
-Device: Xiaomi **MiTV-MZTU0** (`river`), Google TV on Android 14, 1.8 GB RAM, at `192.168.2.13:5555`.
+Device: Xiaomi **MiTV-MZTU0** (`river`), Google TV on Android 14, 1.8 GB RAM, at `192.168.2.14:5555`.
 Every change is reversible. Nothing was removed from the system image: packages were disabled for user 0, except four
 persistent ones that the system starts even when disabled, which were uninstalled for user 0 only (see [Boot](#boot)).
 
@@ -159,7 +159,7 @@ fully off and only the remote or the TV's own button turns it on.
 tools/restore.sh com.google.android.youtube.tvmusic
 ```
 
-Or directly: `adb -s 192.168.2.13:5555 shell pm enable --user 0 <package>` (for the three persistent AirPlay/DIAL
+Or directly: `adb -s 192.168.2.14:5555 shell pm enable --user 0 <package>` (for the three persistent AirPlay/DIAL
 packages, run `cmd package install-existing --user 0 <package>` first). Package names are in the list above or in
 `backup/disabled_by_tools.txt`. To undo everything and return to the stock Google TV home: `tools/restore.sh`.
 

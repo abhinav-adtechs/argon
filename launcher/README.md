@@ -29,7 +29,7 @@ stats, notices over any app, the screensaver and the room's lights and plugs.
 tools/build_install.sh
 ```
 
-From the repo root, with the TV's address in `TV` if it isn't `192.168.2.13:5555`. It builds the release APK, installs
+From the repo root, with the TV's address in `TV` if it isn't `192.168.2.14:5555`. It builds the release APK, installs
 it, compiles it ahead of time, grants what adb can grant (overlay, usage stats, the media listener, TV listings,
 Bluetooth), sets
 it as home and screensaver, and disables the stock launcher and setupwraith (see
@@ -148,7 +148,7 @@ Edit `launcher/app/src/main/res/values/config.xml`, then run `tools/build_instal
 
 - **Starting Home row:** `dock_packages` (left to right, any number). Changing this list resets the row on the TV to
   it; rebuilding without changing it keeps your on-TV edits. Find a package name with
-  `adb -s 192.168.2.13:5555 shell pm list packages | grep -i <name>`.
+  `adb -s 192.168.2.14:5555 shell pm list packages | grep -i <name>`.
 - **Brand tiles:** `BRANDS` in `Apps.java` (package → tile colors, logo color, how to lift the logo from the banner,
   size tweak). The lifted logos are cached in the app's cache dir and redone when the app updates.
 - **Welcome hub widgets:** `DEFAULT_WIDGETS` in `Config.java`, `id:S|L` in order (`continue`, `weather`, `match`,
