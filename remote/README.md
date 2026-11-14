@@ -68,6 +68,14 @@ prompt (the home screen after an install does), a new one appears within a minut
 waits on one shared reconnect loop (1 s, doubling to 15 s). `argon.local` comes from the service's own multicast DNS
 responder (`Mdns.java`), so it follows the TV when the router gives it a new address. Logs: `adb logcat -s Remote`.
 
+**Checking on it from the TV.** The home screen's Inputs tab has a **Web remote** tile: its dot is green while all is
+well, amber while something's wrong or it's restarting, red when it's down. Its page shows the server, the TV link
+(adb), the keys (the virtual keypad) and `argon.local`, each answering or not, and **Restart**, which stops the
+service, kills the `:remote` process (whatever was stuck goes with it) and starts it again; it's back in a few seconds.
+The home screen asks `GET /api/health` every 10 s; the server answers it only from the TV itself (loopback), and
+without a sign-in. The same process connects Bluetooth speakers for the home screen (`RemoteProvider`, not exported),
+since that also needs the shell: see [Speakers](../launcher/README.md#speakers-and-the-web-remote).
+
 Neither the router nor a Mac is a good host: the router (D-Link DIR-825ACG1: Realtek Lexra chip, 64 MB RAM, stock
 firmware) can't run it, and a Mac only serves it while it's awake and on this Wi-Fi.
 

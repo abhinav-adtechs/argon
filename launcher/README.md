@@ -30,7 +30,8 @@ tools/build_install.sh
 ```
 
 From the repo root, with the TV's address in `TV` if it isn't `192.168.2.13:5555`. It builds the release APK, installs
-it, compiles it ahead of time, grants what adb can grant (overlay, usage stats, the media listener, TV listings), sets
+it, compiles it ahead of time, grants what adb can grant (overlay, usage stats, the media listener, TV listings,
+Bluetooth), sets
 it as home and screensaver, and disables the stock launcher and setupwraith (see
 [Why setupwraith is disabled](../README.md#why-setupwraith-is-disabled)). Needs JDK 17 and the Android SDK
 (see [Building on another machine](../README.md#building-on-another-machine)). The web remote's page in
@@ -40,8 +41,8 @@ it as home and screensaver, and disables the stock launcher and setupwraith (see
 
 | Path (`app/src/main/`)               | What                                                                                                                                                                                                                                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `java/com/argon/launcher/`           | The home screen (`HomeActivity`, `HomeView`, `Tiles`, `Glyphs`, `Wallpaper`…), `Screensaver`, `StatsActivity`, the picks (`Recs`), weather and football, `NoticeReceiver`, `ControlReceiver`, `MediaListener` and the viewing stats (`WatchLog`, `WatchStats`)             |
-| `java/com/argon/launcher/remote/`    | The web remote's server, in its own `:remote` process: `RemoteService`, `Server`, `Http`, `Auth`, `Adb`, `Mdns` and the Settings, Files, Home screen and stats endpoints (see [the remote docs](../remote/README.md))                                                      |
+| `java/com/argon/launcher/`           | The home screen (`HomeActivity`, `HomeView`, `Tiles`, `Glyphs`, `Wallpaper`…), `Screensaver`, `StatsActivity`, the picks (`Recs`), weather and football, the speakers (`Speakers`) and the web remote's health (`RemoteStatus`), `NoticeReceiver`, `ControlReceiver`, `MediaListener` and the viewing stats (`WatchLog`, `WatchStats`) |
+| `java/com/argon/launcher/remote/`    | The web remote's server, in its own `:remote` process: `RemoteService`, `Server`, `Http`, `Auth`, `Adb`, `Mdns`, the Settings, Files, Home screen and stats endpoints (see [the remote docs](../remote/README.md)), and Bluetooth for the home screen (`RemoteProvider`, `BluetoothTool`) |
 | `java/com/argon/launcher/smarthome/` | Philips Hue (`Hue`) and Tuya plugs (`Tuya`, `TuyaCloud`), shared through `SmartHome` and `SmartHomeProvider`                                                                                                                                                               |
 | `res/values/config.xml`              | The defaults you can change by rebuilding (see [Change the defaults](#change-the-defaults-rebuild))                                                                                                                                                                        |
 | `assets/`                            | The Inter font and the Material Symbols icons                                                                                                                                                                                                                              |
@@ -56,10 +57,14 @@ glyphs, tiles and wallpaper are drawn here). The [screenshots](#screenshots) sho
   and minute sits left of them.
 - **Row:** square tiles, the focused one larger with a white ring and its name beside it. On Apps: **Welcome**, the
   Home apps (YouTube, Netflix, Prime Video, JioHotstar, Sony LIV to start) and **All Apps**. On Inputs: Live TV,
-  HDMI 1–3 (the name the device reports over HDMI-CEC, dimmed when nothing is plugged in) and AV. Netflix, YouTube,
+  HDMI 1–3 (the name the device reports over HDMI-CEC, dimmed when nothing is plugged in) and AV, then the speakers
+  (**TV speakers** and each paired Bluetooth speaker, dimmed when not connected, a green dot on the one playing the
+  TV's sound) and the **Web remote** (a green, amber or red dot for how its server is doing). Netflix, YouTube,
   Prime Video and Apple TV tiles are their brand colors with the logo lifted from the app's own TV banner; other apps
   get their banner on a blurred field made from it. On Home: the room, then its lights and plugs (see
-  [Lights and plugs](#lights-and-plugs)), each lit in its own colour while it's on.
+  [Lights and plugs](#lights-and-plugs)), each lit in its own colour while it's on. Tiles with a symbol (inputs,
+  speakers, the room, lights and plugs) carry their name inside while small; focused, the name goes and the symbol
+  moves to the middle, so the name shows once, beside it.
 - **Welcome hub** (below Welcome): widgets on the wallpaper, packed into columns from the left and scrolling sideways
   as the focus moves. **Continue Watching** (the large one shows the last three things you were partway through, from
   Netflix, Prime Video, Hotstar and Apple TV's own rows, with a progress bar; OK resumes it in that app), the
@@ -73,6 +78,12 @@ glyphs, tiles and wallpaper are drawn here). The [screenshots](#screenshots) sho
   from that app. With nothing to resume, **Open** comes first.
 - **Input and All Apps hubs:** the name, its state (connected, nothing plugged in, analog input, the number of apps)
   and **Switch to** _input_ / **Open All Apps**.
+- **Speaker hubs:** a Bluetooth speaker: connected (and whether the TV's sound plays there), connecting, or not
+  connected, with **Connect** / **Disconnect**. **TV speakers:** whether they're playing the TV's sound or where it goes
+  instead, and **Use TV speakers** (disconnects the Bluetooth ones) while a speaker has it.
+- **Web remote hub:** running (its address and how many remotes are open), running with a problem, not responding,
+  or not running; **Restart**; and a card each for the server, the TV link (adb), the keys and `argon.local`. See
+  [Speakers and the web remote](#speakers-and-the-web-remote).
 - **Home hubs:** the room: how many are on and the watts, **Turn all off** (or on), **Dim all** (lights to 20%) and
   four **Scenes** (Movie, Unwind, Nighttime, Bright). A light: **Turn off**/**on**, its brightness (focus it, then
   Left/Right, 10% a press) and eight colours, on a glow of the light's own colour with a faint outline of it. A plug:
@@ -123,7 +134,8 @@ cards are left out; Continue Watching still works). `tmdb_region` decides which 
 - **Tabs and buttons:** one line: Left/Right across Apps, Inputs, Home (focusing a tab selects it), Your Viewing and
   Settings. **Down** returns to the row.
 - **Hub:** the arrows move between widgets, buttons and cards by where they sit on screen; **Up** from the top of the
-  hub returns to the row. OK on **Welcome** (or the room) also goes into its hub; OK on a light or plug switches it.
+  hub returns to the row. OK on **Welcome** (or the room, or the web remote) also goes into its hub; OK on a light
+  or plug switches it, on a Bluetooth speaker connects or disconnects it, on TV speakers moves the sound back to them.
   On a light's brightness bar, Left/Right change it instead of moving.
 - **All Apps:** the arrows move across the grid; **Back** closes it.
 - **OK** opens on release; **hold OK** for Options (Move / Remove on a Home app, Add to Home in All Apps).
@@ -261,6 +273,30 @@ adb shell content write --uri content://com.argon.launcher.files/smarthome.json 
 ```
 
 Logs: `adb logcat -s SmartHome`.
+
+## Speakers and the web remote
+
+The Inputs tab's last tiles, after the inputs.
+
+**Speakers.** The TV's own and every paired Bluetooth audio device (pair new ones in the TV's Settings). Whether each
+is connected comes from Bluetooth's own broadcasts, and which one plays the TV's sound from the audio system (where
+media goes now), so a speaker switched off or connected from somewhere else shows within a second. Reading this needs
+`BLUETOOTH_CONNECT`, which `tools/build_install.sh` grants. Connecting and disconnecting are system APIs
+(`BluetoothDevice.connect()`, `disconnect()`) that need `BLUETOOTH_PRIVILEGED`, which no app can get but the shell has,
+so the home screen asks the web remote's process (`RemoteProvider`), which runs `BluetoothTool` from the launcher's
+own APK as the shell over its adb link:
+
+```bash
+adb shell 'CLASSPATH=$(pm path com.argon.launcher | cut -d: -f2) app_process / com.argon.launcher.remote.BluetoothTool connect AA:BB:CC:DD:EE:FF'
+```
+
+It prints `ok`. So connecting needs the web remote running; a speaker that's off or out of range says so in a message
+after Bluetooth gives up on it. **Use TV speakers** disconnects every Bluetooth speaker.
+
+**Web remote.** The home screen asks the server for `GET /api/health` on the TV itself every 10 s while it shows
+(answered only over loopback; see [the remote docs](../remote/README.md#how-it-works)), and checks whether the
+`:remote` process is alive when nothing answers. **Restart** stops the service, kills that process and starts it again
+(the lights and plugs reconnect with it); the page shows Restarting… until all four parts answer, usually 2–3 s.
 
 ## Resource use
 
