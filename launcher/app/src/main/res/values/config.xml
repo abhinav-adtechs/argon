@@ -10,10 +10,6 @@
         <item>com.sonyliv</item>
     </string-array>
 
-    <!-- Elevator music on the home screen, as a percentage of the TV volume. 0 = off.
-         Tracks are res/raw/ambient_{day,night}.ogg. -->
-    <integer name="ambient_volume">35</integer>
-
     <!-- Football chip on the tab row and match card in the drawer: ESPN team id, the number in the club's
          espn.com address (Manchester City = 382). Empty = neither. -->
     <string name="football_team" translatable="false">382</string>

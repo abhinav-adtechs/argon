@@ -4084,32 +4084,6 @@ select.field option {
   font-size: 13px;
   color: var(--text-3);
 }
-.rule {
-  height: 1px;
-  background: var(--line);
-}
-.amb {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.amb .label {
-  width: 150px;
-  flex: none;
-}
-.amb .range {
-  flex: 1;
-  width: auto;
-  min-width: 0;
-}
-.amb-v {
-  min-width: 128px;
-  text-align: right;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
 .hrow {
   display: flex;
   align-items: flex-start;
@@ -4398,21 +4372,6 @@ select.field option {
 .app[data-mode="phone"] .wgrid,
 .app[data-mode="phone"] .pgrid {
   grid-template-columns: minmax(0, 1fr);
-}
-.app[data-mode="phone"] .amb {
-  flex-wrap: wrap;
-  gap: 10px 16px;
-}
-.app[data-mode="phone"] .amb .label {
-  width: auto;
-  flex: 1;
-}
-.app[data-mode="phone"] .amb .range {
-  order: 3;
-  flex-basis: 100%;
-}
-.app[data-mode="phone"] .amb-v {
-  min-width: 0;
 }
 .app[data-mode="phone"] .ritem,
 .app[data-mode="phone"] .ritem .tile {

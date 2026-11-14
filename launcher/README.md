@@ -2,7 +2,7 @@
 
 The TV's home screen (`com.argon.launcher`), styled after the PlayStation 5's home screen and Welcome hub. One Android
 app, Java with no libraries (minSdk 34), that also hosts the [web remote](../remote/README.md)'s server, the viewing
-stats, notices over any app, the elevator music, the screensaver and the room's lights and plugs.
+stats, notices over any app, the screensaver and the room's lights and plugs.
 
 [![The home screen in motion: moving along the row, app hubs, the Inputs tab](docs/media/home_motion.gif)](docs/media/home_motion.mp4)
 
@@ -40,11 +40,10 @@ it as home and screensaver, and disables the stock launcher and setupwraith (see
 
 | Path (`app/src/main/`)               | What                                                                                                                                                                                                                                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `java/com/argon/launcher/`           | The home screen (`HomeActivity`, `HomeView`, `Tiles`, `Glyphs`, `Wallpaper`, `Ambience`…), `Screensaver`, `StatsActivity`, the picks (`Recs`), weather and football, `NoticeReceiver`, `ControlReceiver`, `MediaListener` and the viewing stats (`WatchLog`, `WatchStats`) |
+| `java/com/argon/launcher/`           | The home screen (`HomeActivity`, `HomeView`, `Tiles`, `Glyphs`, `Wallpaper`…), `Screensaver`, `StatsActivity`, the picks (`Recs`), weather and football, `NoticeReceiver`, `ControlReceiver`, `MediaListener` and the viewing stats (`WatchLog`, `WatchStats`)             |
 | `java/com/argon/launcher/remote/`    | The web remote's server, in its own `:remote` process: `RemoteService`, `Server`, `Http`, `Auth`, `Adb`, `Mdns` and the Settings, Files, Home screen and stats endpoints (see [the remote docs](../remote/README.md))                                                      |
 | `java/com/argon/launcher/smarthome/` | Philips Hue (`Hue`) and Tuya plugs (`Tuya`, `TuyaCloud`), shared through `SmartHome` and `SmartHomeProvider`                                                                                                                                                               |
 | `res/values/config.xml`              | The defaults you can change by rebuilding (see [Change the defaults](#change-the-defaults-rebuild))                                                                                                                                                                        |
-| `res/raw/ambient_*.ogg`              | The elevator-music loops                                                                                                                                                                                                                                                   |
 | `assets/`                            | The Inter font and the Material Symbols icons                                                                                                                                                                                                                              |
 
 ## The home screen (on the TV)
@@ -153,36 +152,6 @@ Edit `launcher/app/src/main/res/values/config.xml`, then run `tools/build_instal
 - **Custom tile art:** a 320×180 image at `res/drawable-nodpi/banner_<package with dots as underscores>.png` replaces
   that app's own banner (its tile and All Apps). `banner_com_sonyliv.png` is one: Sony LIV only ships a small square icon on black, so this is
   composed from the app's own "SONY" and "liv" logo artwork.
-
-## Elevator music
-
-A quiet elevator-music loop plays while the home screen is on screen, picked by time of day: Kevin MacLeod's "Local
-Forecast - Elevator" by day (5–17) and a bossa-nova lounge tune at night (17–5). Rules, in order of priority:
-
-- it plays only while home is visible and focused and the screen is on; it waits 1.5 s, then fades in over 4 s;
-- launching anything (an app, Settings, an input) fades it out in 150 ms before the app opens; the decoders are
-  released while you're away, so apps get the memory back;
-- it never starts, and fades out, while any other app is playing (Spotify, a voice reply, anything except notification
-  and click sounds), and it waits for audio focus. Assistant pauses it and it resumes afterwards; if another app takes
-  focus for good, it stays quiet until that app stops playing or you leave and come back home;
-- the screensaver and standby stop it (home isn't visible then).
-
-Setting in `config.xml` (or the web remote): `ambient_volume` (percentage of the TV volume, default 35; `0` turns
-the music off). The loops are `launcher/app/src/main/res/raw/ambient_{day,night}.ogg`; to swap one, cut a new loop and
-rebuild, e.g. `python3 tools/make_loop.py tune.mp3 launcher/app/src/main/res/raw/ambient_day.ogg 37.25 140.488 30`
-(start and length in seconds; optional 5th argument is the high-pass cut-off in Hz, default 60). For music, start and
-end the loop on the same bar of a repeated section, to the sample, so the cross-fade lands on the beat.
-
-Tracks:
-
-| Loop  | Track (section used)                                                                                                 | Author                          | Licence   |
-| ----- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------- |
-| Day   | [Local Forecast - Elevator](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300012) (0:37–2:58)     | Kevin MacLeod (incompetech.com) | CC BY 4.0 |
-| Night | [Which Brand Of Mustard Shall I Buy](https://opengameart.org/content/which-brand-of-mustard-shall-i-buy) (0:17–1:39) | congusbongus                    | CC0       |
-
-"Local Forecast - Elevator" by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0
-(http://creativecommons.org/licenses/by/4.0/). Each was high-passed at 30 Hz, cut between two repeats of the same bars,
-cross-faded into a 4 s seamless loop and matched to −26 LUFS.
 
 ## Notices over any app
 
@@ -323,5 +292,4 @@ window and home stays black (`GraphicBufferAllocator: Failed to allocate (1920 x
 launcher once more for that. Apps left running in the background (TV Settings, a streaming app) hold a lot of it:
 `adb shell grep CmaFree /proc/meminfo`.
 
-No frames are drawn while nothing moves. The music loop costs ~4% of total CPU (decoder + audio server) while it plays
-and nothing when home is in the background. Free RAM after debloat: ~590 MB vs ~540 MB before, with ~15 fewer background processes.
+No frames are drawn while nothing moves. Free RAM after debloat: ~590 MB vs ~540 MB before, with ~15 fewer background processes.

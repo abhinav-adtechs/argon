@@ -14,7 +14,6 @@ import android.media.tv.TvContract;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.PowerManager;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
@@ -25,15 +24,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 // The home screen (HomeView draws all of it). This activity feeds it what the system and the web remote say: the
-// shelf settings, the match, today's viewing, Continue Watching, and keeps the elevator music in step.
+// shelf settings, the match, today's viewing and Continue Watching.
 public class HomeActivity extends Activity implements HomeView.Host {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private SharedPreferences prefs;
     private HomeView home;
-    private Ambience ambience;
     private Football football;
-    private boolean started, resumed, screenOn = true;
+    private boolean started;
     // Strong reference: SharedPreferences only keeps listeners weakly.
     private final SharedPreferences.OnSharedPreferenceChangeListener prefsListener = (p, key) -> {
         if (key != null) onSettingChanged(key);
@@ -44,14 +42,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
         public void onReceive(Context c, Intent i) {
             if (!Intent.ACTION_TIME_TICK.equals(i.getAction())) Ui.init(HomeActivity.this);
             if (started) loadStats();
-        }
-    };
-
-    private final BroadcastReceiver screenReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context c, Intent i) {
-            screenOn = Intent.ACTION_SCREEN_ON.equals(i.getAction());
-            updateAmbience();
         }
     };
 
@@ -82,9 +72,7 @@ public class HomeActivity extends Activity implements HomeView.Host {
         home = new HomeView(this, this, prefs);
         setContentView(home);
         getWindow().setBackgroundDrawable(null);
-        ambience = new Ambience(this, Config.ambient(this, prefs));
         startFootball();
-        screenOn = getSystemService(PowerManager.class).isInteractive();
 
         IntentFilter time = new IntentFilter(Intent.ACTION_TIME_TICK);
         time.addAction(Intent.ACTION_TIME_CHANGED);
@@ -96,9 +84,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
         pkgs.addAction(Intent.ACTION_PACKAGE_REPLACED);
         pkgs.addDataScheme("package");
         registerReceiver(packageReceiver, pkgs, RECEIVER_NOT_EXPORTED);
-        IntentFilter screen = new IntentFilter(Intent.ACTION_SCREEN_ON);
-        screen.addAction(Intent.ACTION_SCREEN_OFF);
-        registerReceiver(screenReceiver, screen, RECEIVER_NOT_EXPORTED);
         startForegroundService(new Intent(this, RemoteService.class));
     }
 
@@ -106,7 +91,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
     protected void onStart() {
         super.onStart();
         started = true;
-        ambience.start();
         if (football != null) football.start();
         getContentResolver().registerContentObserver(TvContract.WatchNextPrograms.CONTENT_URI, true, tvObserver);
         loadShows();
@@ -116,33 +100,22 @@ public class HomeActivity extends Activity implements HomeView.Host {
     @Override
     protected void onResume() {
         super.onResume();
-        resumed = true;
         home.resume();
-        updateAmbience();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        resumed = false;
         home.pause();
-        updateAmbience();
     }
 
     @Override
     protected void onStop() {
         started = false;
-        ambience.stop();
         if (football != null) football.stop();
         getContentResolver().unregisterContentObserver(tvObserver);
         main.removeCallbacks(reloadShows);
         super.onStop();
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        updateAmbience();
     }
 
     // Home pressed while the home screen is already showing: back to the first shelf app. From the web remote's
@@ -160,10 +133,8 @@ public class HomeActivity extends Activity implements HomeView.Host {
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
         unregisterReceiver(timeReceiver);
         unregisterReceiver(packageReceiver);
-        unregisterReceiver(screenReceiver);
         home.destroy();
         if (football != null) football.shutdown();
-        ambience.stop();
         io.shutdownNow();
         super.onDestroy();
     }
@@ -175,7 +146,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
 
     @Override
     public void launch(Intent intent, RectF from) {
-        ambience.silence();
         try {
             if (from == null) {
                 startActivity(intent);
@@ -185,17 +155,12 @@ public class HomeActivity extends Activity implements HomeView.Host {
             }
         } catch (ActivityNotFoundException | SecurityException e) {
             Toast.makeText(this, "Can't open that", Toast.LENGTH_SHORT).show();
-            updateAmbience();
         }
     }
 
     @Override
     public void openStats() {
         launch(new Intent(this, StatsActivity.class), null);
-    }
-
-    private void updateAmbience() {
-        ambience.setVisible(resumed && screenOn && hasWindowFocus());
     }
 
     private void loadShows() {
@@ -228,9 +193,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
                 if (football != null) football.shutdown();
                 football = null;
                 startFootball();
-                break;
-            case Config.AMBIENT:
-                ambience.setLevel(Config.ambient(this, prefs));
                 break;
             case Config.DOCK:
             case Config.WEATHER:

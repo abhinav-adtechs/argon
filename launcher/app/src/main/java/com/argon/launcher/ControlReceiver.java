@@ -30,7 +30,6 @@ import java.util.Set;
 public class ControlReceiver extends BroadcastReceiver {
     private static final String TAG = "Control";
     private static final Set<String> STRINGS = Set.of(Config.DOCK, Config.TEAM, Config.WEATHER, Config.WIDGETS, Config.WALLPAPER);
-    private static final Set<String> INTS = Set.of(Config.AMBIENT);
     private static final int BANNER_W = 320, BANNER_H = 180;
 
     @Override
@@ -68,7 +67,6 @@ public class ControlReceiver extends BroadcastReceiver {
         o.put("apps", apps);
 
         o.put("team", Config.team(c, p));
-        o.put("ambient", Config.ambient(c, p));
         o.put("weather", Config.weather(p));
         o.put("widgets", Config.widgets(p));
         o.put("wallpaper", Config.wallpaper(p));
@@ -80,7 +78,6 @@ public class ControlReceiver extends BroadcastReceiver {
         if (value == null) value = "";
         SharedPreferences.Editor e = p.edit();
         if (STRINGS.contains(key)) e.putString(key, value);
-        else if (INTS.contains(key)) e.putInt(key, Integer.parseInt(value.trim()));
         else return "error: unknown key " + key;
         e.apply();
         return "ok";

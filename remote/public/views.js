@@ -1867,7 +1867,6 @@ const WIDGET_SIZE = Object.fromEntries(
 );
 const WAVES_ART =
   '<svg viewBox="0 0 184 104" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><radialGradient id="wvg" cx="150" cy="18" r="175" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1a4bb0"/><stop offset=".33" stop-color="#0b2766"/><stop offset=".68" stop-color="#05102b"/><stop offset="1" stop-color="#02040c"/></radialGradient></defs><rect width="184" height="104" fill="url(#wvg)"/><g fill="none" stroke="#5cb6ff" stroke-opacity=".75" stroke-width=".9"><path d="M-10 92C40 70 80 84 112 52S170 12 196 4"/><path d="M-10 97C42 75 82 89 115 57S173 17 199 9"/></g></svg>';
-const ambText = (v) => (+v ? `${v}% of TV volume` : "Off");
 
 VIEWS.home = {
   H: null,
@@ -2009,23 +2008,6 @@ VIEWS.home = {
           el("small", { text: sub }),
         ),
       );
-    const amb = el("b", { class: "amb-v", text: ambText(H.ambient) });
-    const slider = fillRange(
-      el("input", {
-        type: "range",
-        class: "range",
-        min: "0",
-        max: "100",
-        step: "5",
-        value: String(H.ambient),
-        "aria-label": "Elevator music volume",
-        oninput: (e) => (amb.textContent = ambText(e.target.value)),
-        onchange: async (e) => {
-          if (await this.set("ambient_volume", e.target.value))
-            H.ambient = +e.target.value;
-        },
-      }),
-    );
     return el(
       "section",
       { class: "cardx h-wall" },
@@ -2070,14 +2052,6 @@ VIEWS.home = {
           () => file.click(),
         ),
         file,
-      ),
-      el("div", { class: "rule" }),
-      el(
-        "div",
-        { class: "amb" },
-        el("span", { class: "label", text: "Elevator music" }),
-        slider,
-        amb,
       ),
     );
   },
