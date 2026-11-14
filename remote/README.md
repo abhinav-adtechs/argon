@@ -75,6 +75,15 @@ firmware) can't run it, and a Mac only serves it while it's awake and on this Wi
 the remote keeps running for the first 3 hours of standby, so its power button turns the TV back on. Asleep, the TV
 drops off the Wi-Fi for seconds at a time (it answered about 75% of requests in testing), so:
 
+- Android's Low Power Standby cuts every app off the network a few seconds after the TV goes to sleep, foreground
+  service or not, loopback to adbd included: the page, `argon.local` and the remote's own adb link all go. No Energy
+  mode exempts the launcher (each one's policy lists only Google's and the TV maker's packages), and the
+  "Unrestricted" mode that turns it off is hidden on this TV. So the service turns it off itself through its adb shell
+  (`settings put global low_power_standby_enabled 0`) when it starts and whenever picking an Energy mode turns it
+  back on; Doze still lets a foreground service through. A temporary allowlist entry isn't enough: the TV suspends
+  during its naps, the service's timers stop with it, and once an entry lapses the service can't reach adbd to
+  renew it. Check with `adb shell dumpsys netpolicy | grep UID=<launcher uid>`: `effective=NONE` is reachable,
+  `effective=LOW_POWER_STANDBY` is cut off.
 - The server links the page's CSS and scripts with `?v=<install>` and lets browsers keep them for good; a new install
   changes the links. Opening the remote then needs only the page itself, and the browser waits out a nap rather than
   failing (one load took 14 s). It can't open with the TV fully off: caching the page itself needs a service worker,

@@ -3,6 +3,7 @@ package com.argon.launcher.remote;
 import static com.argon.launcher.remote.Shell.quote;
 
 import android.content.Context;
+import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -12,6 +13,7 @@ import android.media.tv.TvInputManager;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 
 import com.argon.launcher.ContinueFeed;
 import com.argon.launcher.smarthome.SmartHome;
@@ -108,6 +110,7 @@ final class Server {
     // The page's own stylesheet and scripts, as the HTML links them (see file()).
     private static final Pattern ASSET_LINK = Pattern.compile("(href|src)=\"(app\\.css|app\\.js|views\\.js)\"");
 
+    private static final String LOW_POWER_STANDBY = "low_power_standby_enabled";
     private static final String VOLUME_CMD = "cmd media_session volume --stream 3 --get | grep 'volume is'; "
             + "dumpsys audio | grep -A1 '^- STREAM_MUSIC:' | head -2";
     private static final Pattern TOP_PKG = Pattern.compile("u0 ([\\w.]+)/");
@@ -205,16 +208,34 @@ final class Server {
             if (!clients.isEmpty() && remote.ready) remote.ping();
         }, 2, 2, TimeUnit.SECONDS);
         timers.scheduleWithFixedDelay(auth::flush, 1, 1, TimeUnit.MINUTES);
+        // Picking an Energy mode turns Low Power Standby back on.
+        context.getContentResolver().registerContentObserver(Settings.Global.getUriFor(LOW_POWER_STANDBY), false,
+                new ContentObserver(null) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        timers.execute(Server.this::lowPowerStandbyOff);
+                    }
+                });
         // Waits for adb first, or the first commands time out and those apps fall back to `monkey`.
         Thread t = new Thread(() -> {
             try {
                 link.get(Long.MAX_VALUE);
+                lowPowerStandbyOff();
                 setup();
             } catch (InterruptedException ignored) {
             }
         }, "remote-setup");
         t.setDaemon(true);
         t.start();
+    }
+
+    // Asleep, Low Power Standby firewalls every app off the network, loopback to adbd included, foreground service
+    // or not, and no Energy mode's policy exempts this one, so the remote and argon.local would be gone. Off is what
+    // the "Unrestricted" Energy mode (hidden on this TV) does; Doze still lets a foreground service through. Apps
+    // can't read the setting (it's hidden), so the shell checks it.
+    private void lowPowerStandbyOff() {
+        mgmt.run("[ \"$(settings get global " + LOW_POWER_STANDBY + ")\" = 0 ] || settings put global "
+                + LOW_POWER_STANDBY + " 0");
     }
 
     private void safeRefreshTick() {

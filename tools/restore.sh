@@ -18,4 +18,5 @@ if [ $# -eq 0 ]; then
   tv settings delete secure screensaver_components
   tv am start -a android.intent.action.MAIN -c android.intent.category.HOME
   echo "Stock launcher restored. To remove the custom one: adb -s $TV uninstall com.argon.launcher"
+  echo "then turn Low Power Standby back on (the web remote turns it off): adb -s $TV shell settings put global low_power_standby_enabled 1"
 fi
