@@ -52,9 +52,9 @@ it as home and screensaver, and disables the stock launcher and setupwraith (see
 Styled after the PlayStation 5's home screen and its Welcome hub, drawn by hand on one Canvas (no Sony artwork: the
 glyphs, tiles and wallpaper are drawn here). The [screenshots](#screenshots) show it on the TV.
 
-- **Top:** three tabs, **Apps**, **Inputs** and **Home** (focusing one selects it). Top right: **Your Viewing** (the stats screen),
-  **Settings** (the TV's), the weather and the time. While the football club plays, a red **LIVE** pill with the score
-  and minute sits left of them.
+- **Top:** four tabs, **Apps**, **Inputs**, **Home** and **Football Central** (focusing one selects it). Top right:
+  **Your Viewing** (the stats screen), **Settings** (the TV's), the weather and the time. While the football club plays,
+  a red **LIVE** pill with the score and minute sits left of them, and a red dot on the club's crest in its tab.
 - **Row:** square tiles, the focused one larger with a white ring and its name beside it. On Apps: **Welcome**, the
   Home apps (YouTube, Netflix, Prime Video, JioHotstar, Sony LIV to start) and **All Apps**. On Inputs: Live TV,
   HDMI 1–3 (the name the device reports over HDMI-CEC, dimmed when nothing is plugged in) and AV, then the speakers
@@ -96,10 +96,31 @@ glyphs, tiles and wallpaper are drawn here). The [screenshots](#screenshots) sho
 - **Wallpaper:** _Waves_ (a deep blue glow with light streaks and faint ○ △ ✕ □ line art, drawn once and kept in
   `files/waves-v2.png`), _Top pick_ (this hour's top pick, darkened), or a photo sent from the web remote
   (`files/wallpaper.jpg`). An app hub cross-fades to that app's picture and back.
+- **Football Central** (Manchester City): the club's own tab, on a City wallpaper (midnight navy, the shield's sky-blue
+  stripes, the crest large and faint top right), with a row of eight tiles that show what's in them:
+  - **Match Centre** (its tile: both crests and the kick-off, the live minute and score, or full time): the match
+    under way, just finished (for about two hours after) or next. Before it: kick-off time, date and a countdown, each
+    side's place and points and last five, the last five meetings, the two seasons side by side and who to watch.
+    About an hour before kick-off the **lineups** appear on a pitch, both elevens in their formations. During and after:
+    the score, the minute (LIVE) or full time, who scored and when, red cards, and possession, shots and corners; on the
+    pitch, goals, cards and who was taken off. From three hours before kick-off to the final whistle, **Watch on**
+    opens the app that shows it (JioHotstar for the Premier League, Sony LIV for the Champions League; see
+    `football_watch`). A goal, kick-off and the final whistle also slide in as a message top right.
+  - **News:** the club's latest stories with their pictures; OK opens one full screen (its picture, headline, byline
+    and the whole story; Up/Down scroll, Back closes).
+  - **Transfers:** what ESPN's daily transfer column says about City in the last three weeks, item by item with the
+    paper that reported it, and the club's own transfer stories; where the window stands.
+  - **Form:** the last five results (opponent, score, who scored, W/D/L) and the season so far in all competitions,
+    plus the league's top scorer and assister.
+  - **Fixtures:** the next eight, in every competition, with local kick-off times.
+  - **Premier League** and **Champions League:** the full tables (the league phase's 36 too), City's row in sky blue,
+    the zones marked, and how far City are from the top.
+  - **Cups:** the Carabao Cup (the next tie and the road so far) and the FA Cup (in from the third round, in January).
 - **Screensaver:** the picks' photos full screen, one every 30 s with a slow zoom and pan, the title bottom left, and
   a large thin clock with the date and weather top left (`com.argon.launcher/.Screensaver`, set by
   `tools/build_install.sh`; the system still decides when it starts). With no photos, the Waves wallpaper and a
-  drifting clock.
+  drifting clock. Top right, City in brief: the live score (or the result, or the next match with a countdown), City's
+  place or round in each of the four competitions, the last five, and the latest headline (a new one with each photo).
 - **Motion, PS5-style:** quick and without overshoot. Along the row the focused tile grows in place while the row
   glides under it; the old name fades in the first half of the move and the new one slides out from its tile in the
   last. Moving starts the hub fading out at once; the new hub rises in once the row stops (~150–300 ms), and the new
@@ -109,10 +130,13 @@ glyphs, tiles and wallpaper are drawn here). The [screenshots](#screenshots) sho
   message slides in from the right.
 - A quiet click plays on focus moves and opens (home screen only).
 
-Data: TMDB (picks), Open-Meteo (weather, sunrise, sunset; no key), ESPN's public scores feed (the match; no key). The
-match refreshes every 30 s during a game, otherwise every 30 minutes and again at kick-off; the weather every 30
-minutes; the picks every 6 hours or when the time of day changes. All only while the home screen (or screensaver) is
-showing.
+Data: TMDB (picks), Open-Meteo (weather, sunrise, sunset; no key), ESPN's public site API (Football Central, the
+match; no key: `City.java`). The match refreshes every 30 s during a game, every 2 minutes in the three hours before
+kick-off (for the lineups), every 5 minutes after it, otherwise every 30 minutes and again at kick-off; tables, news and
+transfer talk every 30 minutes; the weather every 30 minutes; the picks every 6 hours or when the time of day changes.
+All only while the home screen (or screensaver) is showing. The club's data is kept in `files/city.json` and the crests
+and news pictures in the cache dir, so both open with the last answers. The crests and pictures are ESPN's, downloaded
+on the TV; none are in this repo.
 
 ### The TMDB key
 
@@ -160,7 +184,10 @@ Edit `launcher/app/src/main/res/values/config.xml`, then run `tools/build_instal
   `launcher/secrets.properties`.
 - **Live TV app** on the Inputs tab: `live_tv_package`.
 - **Football team:** `football_team` is the ESPN team id, the number in the club's espn.com address (Man City `382`,
-  e.g. `espn.com/soccer/club/_/id/382/manchester-city`). Empty hides the LIVE pill and the match widget.
+  e.g. `espn.com/soccer/club/_/id/382/manchester-city`). Empty hides Football Central, the screensaver's club panel,
+  the LIVE pill and the match widget. The look (`CityArt.java`) is Manchester City's whatever the team.
+- **Watch on:** `football_watch`, one `league slug|package` per competition (`eng.1|in.startv.hotstar`,
+  `uefa.champions|com.sonyliv`); the button only shows when that app is installed.
 - **Custom tile art:** a 320×180 image at `res/drawable-nodpi/banner_<package with dots as underscores>.png` replaces
   that app's own banner (its tile and All Apps). `banner_com_sonyliv.png` is one: Sony LIV only ships a small square icon on black, so this is
   composed from the app's own "SONY" and "liv" logo artwork.

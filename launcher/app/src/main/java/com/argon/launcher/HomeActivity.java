@@ -24,13 +24,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 // The home screen (HomeView draws all of it). This activity feeds it what the system and the web remote say: the
-// shelf settings, the match, today's viewing and Continue Watching.
+// shelf settings, today's viewing and Continue Watching (HomeView takes the club's data from City itself).
 public class HomeActivity extends Activity implements HomeView.Host {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private SharedPreferences prefs;
     private HomeView home;
-    private Football football;
     private boolean started;
     // Strong reference: SharedPreferences only keeps listeners weakly.
     private final SharedPreferences.OnSharedPreferenceChangeListener prefsListener = (p, key) -> {
@@ -72,7 +71,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
         home = new HomeView(this, this, prefs);
         setContentView(home);
         getWindow().setBackgroundDrawable(null);
-        startFootball();
 
         IntentFilter time = new IntentFilter(Intent.ACTION_TIME_TICK);
         time.addAction(Intent.ACTION_TIME_CHANGED);
@@ -91,7 +89,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
     protected void onStart() {
         super.onStart();
         started = true;
-        if (football != null) football.start();
         getContentResolver().registerContentObserver(TvContract.WatchNextPrograms.CONTENT_URI, true, tvObserver);
         loadShows();
         loadStats();
@@ -112,7 +109,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
     @Override
     protected void onStop() {
         started = false;
-        if (football != null) football.stop();
         getContentResolver().unregisterContentObserver(tvObserver);
         main.removeCallbacks(reloadShows);
         super.onStop();
@@ -134,7 +130,6 @@ public class HomeActivity extends Activity implements HomeView.Host {
         unregisterReceiver(timeReceiver);
         unregisterReceiver(packageReceiver);
         home.destroy();
-        if (football != null) football.shutdown();
         io.shutdownNow();
         super.onDestroy();
     }
@@ -177,22 +172,12 @@ public class HomeActivity extends Activity implements HomeView.Host {
         });
     }
 
-    private void startFootball() {
-        String team = Config.team(this, prefs);
-        home.setFootball(!team.isEmpty(), null);
-        if (team.isEmpty()) return;
-        football = new Football(team, 128, m -> home.setFootball(true, m));
-        if (started) football.start();
-    }
-
     // ---------- Settings from the web remote ----------
 
     private void onSettingChanged(String key) {
         switch (key) {
             case Config.TEAM:
-                if (football != null) football.shutdown();
-                football = null;
-                startFootball();
+                City.get(this).setTeam(Config.team(this, prefs));
                 break;
             case Config.DOCK:
             case Config.WEATHER:

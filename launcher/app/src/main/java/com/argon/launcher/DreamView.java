@@ -38,11 +38,13 @@ import java.util.concurrent.Executors;
  *  - the recommendations' photos in full screen, one every 30 s, with a slow zoom and pan and a crossfade between them;
  *    each photo is loaded 10% larger than the screen, so the zoom never upscales it;
  *  - top left, a large light clock with the date and the weather;
- *  - bottom left, the photo's title and genre · runtime · service.
+ *  - bottom left, the photo's title and genre · runtime · service;
+ *  - top right, the club in brief (City.java): the live score or the next match with a countdown, where it stands in
+ *    each competition, its last five, and a headline (a new one with each photo).
  * Dark scrims only where there is text, stronger where the photo is bright. Any key exits.
  * Without photos (no TMDB key, or before the first fetch): the clock over the home screen's wallpaper.
  */
-final class DreamView extends View implements Choreographer.FrameCallback, Weather.Listener, Recs.Listener {
+final class DreamView extends View implements Choreographer.FrameCallback, Weather.Listener, Recs.Listener, City.Listener {
     private static final long SHOW_MS = 30_000, FADE_MS = 3_000, FIRST_MS = 1_600;
     private static final float ZOOM = 0.1f;
     /** Photos 10% larger than the screen (the zoom goes up to 1.1 without upscaling). */
@@ -75,6 +77,13 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
     private ExecutorService worker = Executors.newSingleThreadExecutor();
     private final RenderNode content = new RenderNode("clock");     // without photos: the clock over the wallpaper
     private final RenderNode chrome = new RenderNode("corner");     // the clock, the date and the weather
+    private final RenderNode club = new RenderNode("club");         // the club's panel, top right
+    private final City city;
+    private boolean clubDirty = true;
+    private int headline = -1;
+    private Paint clubEyebrow, clubTitle, clubText, clubValue, clubDim, clubScore, clubLetter;
+    private final Paint clubFill = new Paint(Paint.ANTI_ALIAS_FLAG), clubStroke = new Paint(Paint.ANTI_ALIAS_FLAG),
+            clubImage = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Matrix matrix = new Matrix();
     private final float[] placeA = new float[3], placeB = new float[3];
     private final Paint photoPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
@@ -111,6 +120,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
         super(c);
         data = Weather.get(c);
         recs = Recs.get(c);
+        city = City.get(c);
         content.setUseCompositingLayer(true, null);
         black.setColor(0xFF000000);
     }
@@ -124,6 +134,8 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
         failed.clear();
         fallback = recs.showcase().isEmpty();
         data.addListener(this);
+        city.addListener(this);
+        clubDirty = true;
         recs.addListener(this);
         data.refreshIfStale();
         recs.refreshIfStale();
@@ -152,6 +164,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
         Choreographer.getInstance().removeFrameCallback(this);
         handler.removeCallbacks(tick);
         data.removeListener(this);
+        city.removeListener(this);
         recs.removeListener(this);
         // The photos stay in GPU memory until the garbage collector runs: release them now (after the last frame).
         final Set<Bitmap> gone = new HashSet<>();
@@ -164,6 +177,11 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
     @Override protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         worker.shutdownNow();
+    }
+
+    @Override public void onCity() {
+        clubDirty = true;
+        invalidate();
     }
 
     @Override public void onWeather() {
@@ -190,6 +208,17 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
         titlePaint = new TextPaint(Ui.text(Ui.displaySemibold, 56 * k, 0xFFFFFFFF));
         titlePaint.setLetterSpacing(-0.005f);
         metaPaint = Ui.text(Ui.regular, 26 * k, 0xCCFFFFFF);
+        club.setPosition(0, 0, w, h);
+        clubEyebrow = Ui.text(Ui.semibold, 18 * k, CityArt.SKY_LIGHT);
+        clubEyebrow.setLetterSpacing(0.08f);
+        clubTitle = Ui.text(Ui.semibold, 32 * k, 0xFFFFFFFF);
+        clubText = Ui.text(Ui.regular, 22 * k, 0xE0FFFFFF);
+        clubValue = Ui.text(Ui.semibold, 22 * k, 0xFFFFFFFF);
+        clubDim = Ui.text(Ui.regular, 20 * k, 0xB3FFFFFF);
+        clubScore = Ui.numbers(Ui.light, 52 * k, 0xFFFFFFFF);
+        clubLetter = Ui.text(Ui.semibold, 14 * k, 0xFFFFFFFF);
+        clubStroke.setStyle(Paint.Style.STROKE);
+        clubDirty = true;
         for (Paint p : new Paint[] {clockPaint, ampmPaint, datePaint, weatherPaint, titlePaint, metaPaint}) {
             p.setShadowLayer(18 * k, 0, 2 * k, 0x59000000);
         }
@@ -344,6 +373,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
             date = Ui.date(now);
             dirty = true;
             chromeDirty = true;
+            clubDirty = true;
         }
         if (running) advance(up);
 
@@ -352,7 +382,10 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
             if (fallback) drawFallback(canvas, up, current == null ? 1 : 1 - first);
             else canvas.drawRect(0, 0, w, h, black);
         }
-        if (current == null) return;
+        if (current == null) {
+            if (fallback) drawClub(canvas, up, 1);
+            return;
+        }
         if (fallback && first >= 1) fallback = false;
 
         place(current, up, placeA);
@@ -367,6 +400,174 @@ final class DreamView extends View implements Choreographer.FrameCallback, Weath
         chrome.setAlpha(first);
         canvas.drawRenderNode(chrome);
         drawCaptions(canvas, up);
+        drawClub(canvas, up, first);
+    }
+
+    // MARK: - Top right: the club in brief
+
+    private void drawClub(Canvas canvas, long up, float alpha) {
+        City.Data d = city.data;
+        if (!city.enabled() || !d.loaded) return;
+        int n = Math.min(3, d.news.size());
+        int pick = n == 0 ? 0 : (int) (((up - startedAt) / SHOW_MS) % n);
+        if (pick != headline) {
+            headline = pick;
+            clubDirty = true;
+        }
+        if (clubDirty) {
+            RecordingCanvas c = club.beginRecording(w, h);
+            try {
+                recordClub(c, d, System.currentTimeMillis());
+            } finally {
+                club.endRecording();
+            }
+            clubDirty = false;
+        }
+        club.setAlpha(alpha);
+        canvas.drawRenderNode(club);
+    }
+
+    /**
+     * Navy glass top right: the crest and the club's name; the match (live score, the result, or the next one with a
+     * countdown); a line per competition with the place or the round; the last five; a headline.
+     */
+    private void recordClub(Canvas c, City.Data d, long now) {
+        float l = 1236 * k, r = 1800 * k, x = l + 32 * k, right = r - 32 * k, y = 96 * k;
+        // Measured first: the panel is drawn under what follows, so its height is worked out by laying out twice.
+        float height = layoutClub(null, d, now, x, right, y) - y + 26 * k;
+        clubFill.setShader(null);
+        clubFill.setColor(0xC70A1631);
+        c.drawRoundRect(l, y, r, y + height, 22 * k, 22 * k, clubFill);
+        clubStroke.setColor(CityArt.CARD_LINE);
+        clubStroke.setStrokeWidth(1.5f * k);
+        c.drawRoundRect(l, y, r, y + height, 22 * k, 22 * k, clubStroke);
+        layoutClub(c, d, now, x, right, y);
+    }
+
+    /** Draws the panel's contents when `c` isn't null; returns the bottom of the last line either way. */
+    private float layoutClub(Canvas c, City.Data d, long now, float x, float right, float y) {
+        float width = right - x;
+        y += 50 * k;
+        Bitmap crest = city.crest(d.club.id);
+        if (c != null) {
+            if (crest != null) crestAt(c, crest, x + 20 * k, y - 7 * k, 42 * k);
+            c.drawText((d.club.name.isEmpty() ? "Football" : d.club.name).toUpperCase(Locale.getDefault()), x + (crest != null ? 54 : 0) * k,
+                    y, clubEyebrow);
+        }
+        y += 22 * k;
+        City.Match m = d.match;
+        if (m != null) {
+            boolean pre = m.state == City.NEXT;
+            y += 34 * k;
+            String eyebrow = m.state == City.LIVE ? "● LIVE " + m.detail : m.state == City.FULL_TIME ? "FULL TIME"
+                    : "NEXT · " + new SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(new Date(m.kickoff)) + " · " + Ui.time(m.kickoff);
+            if (c != null) {
+                clubEyebrow.setColor(m.state == City.LIVE ? 0xFFFF6B60 : CityArt.SKY_LIGHT);
+                c.drawText(fitText(eyebrow.toUpperCase(Locale.getDefault()) + " · " + m.competition.toUpperCase(Locale.getDefault()), clubEyebrow, width), x, y, clubEyebrow);
+                clubEyebrow.setColor(CityArt.SKY_LIGHT);
+            }
+            if (pre) {
+                City.Side them = m.them();
+                y += 52 * k;
+                if (c != null) {
+                    crestAt(c, city.crest(them.id), x + 22 * k, y - 11 * k, 46 * k);
+                    c.drawText(fitText((m.home.id.equals(m.club) ? "vs " : "at ") + them.name, clubTitle, width - 60 * k), x + 58 * k, y, clubTitle);
+                }
+                y += 34 * k;
+                if (c != null) {
+                    String sub = City.countdown(m.kickoff, now) + (m.venue.isEmpty() ? "" : " · " + m.venue);
+                    c.drawText(fitText(sub.substring(0, 1).toUpperCase(Locale.getDefault()) + sub.substring(1), clubDim, width - 58 * k), x + 58 * k, y, clubDim);
+                }
+            } else {
+                y += 66 * k;
+                if (c != null) {
+                    float cx = x + width / 2;
+                    String score = (m.home.score == null ? "0" : m.home.score) + " – " + (m.away.score == null ? "0" : m.away.score);
+                    float sw = clubScore.measureText(score);
+                    c.drawText(score, cx - sw / 2, y, clubScore);
+                    crestAt(c, city.crest(m.home.id), cx - sw / 2 - 44 * k, y - 18 * k, 48 * k);
+                    crestAt(c, city.crest(m.away.id), cx + sw / 2 + 44 * k, y - 18 * k, 48 * k);
+                    clubValue.setTextAlign(Paint.Align.RIGHT);
+                    c.drawText(m.home.abbr, cx - sw / 2 - 80 * k, y - 8 * k, clubValue);
+                    clubValue.setTextAlign(Paint.Align.LEFT);
+                    c.drawText(m.away.abbr, cx + sw / 2 + 80 * k, y - 8 * k, clubValue);
+                }
+                y += 6 * k;
+            }
+        }
+        // Where the club stands in each competition.
+        y += 22 * k;
+        if (c != null) divider(c, x, right, y);
+        y += 10 * k;
+        for (City.Table t : new City.Table[] {d.table, d.europe}) {
+            City.Row row = t == null ? null : t.row(d.club.id);
+            if (row == null) continue;
+            y += 38 * k;
+            if (c != null) line(c, t.name, City.ordinal(row.rank) + " · " + row.points + " pts", x, right, y);
+        }
+        for (City.Cup cup : d.cups) {
+            y += 38 * k;
+            if (c == null) continue;
+            String v = cup.out ? "Out" : !cup.waiting.isEmpty() ? cup.stage + " · January"
+                    : cup.next != null ? cup.stage + " · " + new SimpleDateFormat("d MMM", Locale.getDefault()).format(new Date(cup.next.date)) : cup.stage;
+            line(c, cup.name, v, x, right, y);
+        }
+        String form = d.formString();
+        if (!form.isEmpty()) {
+            y += 42 * k;
+            if (c != null) {
+                c.drawText("Form", x, y, clubText);
+                float ps = 24 * k, gap = 6 * k;
+                for (int i = 0; i < form.length(); i++) {
+                    float cx = right - (form.length() - 1 - i) * (ps + gap) - ps / 2;
+                    CityArt.pill(c, form.charAt(i), cx, y - Ui.halfCap(clubText), ps, clubFill, clubLetter);
+                }
+            }
+        }
+        // A headline, a different one with each photo.
+        if (!d.news.isEmpty() && headline >= 0 && headline < d.news.size()) {
+            City.Story s = d.news.get(headline);
+            y += 26 * k;
+            if (c != null) divider(c, x, right, y);
+            y += 38 * k;
+            if (c != null) {
+                c.drawText("LATEST", x, y, clubEyebrow);
+                String ago = City.ago(s.published, now);
+                c.drawText(ago, right - clubDim.measureText(ago), y, clubDim);
+            }
+            StaticLayout lay = StaticLayout.Builder.obtain(s.headline, 0, s.headline.length(), new TextPaint(clubValue), Math.round(width))
+                    .setMaxLines(2).setEllipsize(TextUtils.TruncateAt.END).setLineSpacing(0, 1.15f).build();
+            y += 14 * k;
+            if (c != null) {
+                c.save();
+                c.translate(x, y);
+                lay.draw(c);
+                c.restore();
+            }
+            y += lay.getHeight();
+        }
+        return y;
+    }
+
+    private void line(Canvas c, String label, String value, float x, float right, float y) {
+        float vw = clubValue.measureText(value);
+        c.drawText(fitText(label, clubText, right - x - vw - 20 * k), x, y, clubText);
+        c.drawText(value, right - vw, y, clubValue);
+    }
+
+    private void divider(Canvas c, float x, float right, float y) {
+        clubFill.setShader(null);
+        clubFill.setColor(0x1FFFFFFF);
+        c.drawRect(x, y, right, y + Math.max(1, k), clubFill);
+    }
+
+    private void crestAt(Canvas c, Bitmap b, float cx, float cy, float size) {
+        if (b == null) return;
+        c.drawBitmap(b, null, new RectF(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2), clubImage);
+    }
+
+    private static String fitText(String s, Paint p, float width) {
+        return TextUtils.ellipsize(s, new TextPaint(p), width, TextUtils.TruncateAt.END).toString();
     }
 
     private static float fadeIn(long elapsed, long duration) {
