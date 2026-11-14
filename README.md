@@ -33,7 +33,6 @@ tablet or laptop on the Wi-Fi.
 | `tools/shot.sh name [KEY…]`                           | Presses remote keys over ADB (`DPAD_DOWN`, `HOME`, `BACK`…) and saves `shots/name.png`.                                                                                  |
 | `tools/wake.sh [secs]`                                | Turns the TV on from standby over ADB, retrying while it naps (needs Screenless mode, see [Waking the TV](#waking-the-tv-from-a-laptop)).                                |
 | `tools/make_symbols.py font.ttf font.codepoints out/` | Renders the home screen's icons (white PNGs in `assets/symbols`) from the Material Symbols Rounded font (needs `Pillow`).                                                |
-| `tools/make_loop.py in out.ogg start len`             | Cuts a seamless, loudness-matched loop from a recording or a song (needs `numpy`, `scipy`, `soundfile`, `ffmpeg`).                                                       |
 
 All scripts read the TV address from `TV` (default `192.168.2.13:5555`): `TV=192.168.2.50:5555 tools/restore.sh`.
 
