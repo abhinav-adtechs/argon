@@ -81,7 +81,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
             GLASS = 0x29FFFFFF, GREEN = 0xFF43D17A, LIVE_RED = 0xFFFF453A, INK = 0xFF000000;
     // The PS5's motion: quick, no overshoot. Response is the spring's period in seconds (Spring.java).
     private static final float TILE_RESPONSE = 0.24f;
-    private static final int P_TILE = 0, P_RING = 1, P_SHADOW = 2, P_LABEL = 3;
+    private static final int P_TILE = 0, P_RING = 1, P_SHADOW = 2, P_LABEL = 3, P_ICON = 4, P_NAME = 5;
+    // Bottom to top: a growing tile never covers its neighbour's ring.
+    private static final int[] P_ORDER = {P_SHADOW, P_TILE, P_ICON, P_NAME, P_RING, P_LABEL};
     private static final float RING_PAD = 12, SHADOW_PAD = 48, LABEL_W = 720, LABEL_H = 64, LABEL_ASCENT = 46;
     // A new row (another tab, or back home) slides in from the right, tile after tile; the old one slides away.
     private static final long ENTER_MS = 420, ENTER_STAGGER = 32, LEAVE_MS = 180;
@@ -1080,16 +1082,23 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
     // slides, grows and fades them through their properties. Redrawing the row on every frame of a move is what dropped
     // frames on this TV; moving what's already drawn doesn't.
 
-    /** A tile's views: the tile, its focus ring, its shadow and its name. */
+    /**
+     * A tile's views: the tile, its focus ring, its shadow and its name. A named tile (see named()) also has its symbol
+     * and the name inside it as views of their own: focused, the inner name fades and the symbol settles to the middle,
+     * so the name only shows beside it, as on an app's tile.
+     */
     private final class Pieces {
         final Piece shadow = new Piece(P_SHADOW), tile = new Piece(P_TILE), ring = new Piece(P_RING), label = new Piece(P_LABEL);
+        final Piece icon, name;
 
         Pieces(Tile t) {
+            icon = named(t) ? new Piece(P_ICON) : null;
+            name = named(t) ? new Piece(P_NAME) : null;
             for (Piece p : all()) p.tile = t;
         }
 
         Piece[] all() {
-            return new Piece[] {shadow, tile, ring, label};
+            return icon == null ? new Piece[] {shadow, tile, ring, label} : new Piece[] {shadow, tile, icon, name, ring, label};
         }
     }
 
@@ -1104,7 +1113,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
             setPivotY(0);
             setAlpha(0);
             float big = BIG * k;
-            int size = Math.round(kind == P_TILE ? big : kind == P_RING ? big + 2 * RING_PAD * k
+            int size = Math.round(kind == P_TILE || kind == P_ICON || kind == P_NAME ? big : kind == P_RING ? big + 2 * RING_PAD * k
                     : kind == P_SHADOW ? big + 2 * SHADOW_PAD * k : 0);
             if (kind == P_LABEL) layout(0, 0, Math.round(LABEL_W * k), Math.round(LABEL_H * k));
             else layout(0, 0, size, size);
@@ -1121,7 +1130,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
             switch (kind) {
                 case P_TILE:
                     cell.set(0, 0, big, big);
-                    drawTileBody(c, tile, cell);
+                    if (named(tile)) drawTileBack(c, tile, cell);
+                    else drawTileBody(c, tile, cell);
                     if (moving && row.indexOf(tile) == rowIndex) {
                         fill.setColor(0xD9000000);
                         c.drawCircle(big / 2, big - 30 * k, 22 * k, fill);
@@ -1139,6 +1149,12 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                     shadows.draw(c, pad + big / 2, pad + big / 2 + 16 * k, big, big, 18 * k, 26 * k, 0x8C000000, 1);
                     break;
                 }
+                case P_ICON:
+                    drawTileIcon(c, tile, big / 2, big / 2, big * 0.36f);
+                    break;
+                case P_NAME:
+                    drawTileName(c, tile, big);
+                    break;
                 default:
                     c.drawText(fit(tile.label, rowLabel, 700 * k), 0, LABEL_ASCENT * k, rowLabel);
                     break;
@@ -1172,8 +1188,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         pieces.clear();
         for (Tile t : row) pieces.add(new Pieces(t));
         // In layers: every shadow, then every tile, ring and name, so a growing tile never covers its neighbour's ring.
-        for (int layer = 0; layer < 4; layer++) {
-            for (Pieces p : pieces) rowGroup.addView(p.all()[layer]);
+        for (int kind : P_ORDER) {
+            for (Pieces p : pieces) for (Piece v : p.all()) if (v.kind == kind) rowGroup.addView(v);
         }
         if (animate) enterAt = up;
         rowStale = true;
@@ -1198,6 +1214,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
             place(p.tile, x, y, sc, alpha);
             place(p.ring, x - RING_PAD * k * sc, y - RING_PAD * k * sc, sc, alpha * f * Ui.clamp(rowRing.value));
             place(p.shadow, x - SHADOW_PAD * k * sc, y - SHADOW_PAD * k * sc, sc, alpha * f);
+            if (p.icon != null) {
+                // Unfocused, the symbol sits above the inner name (at 42% of the tile); focused, in the middle.
+                place(p.icon, x, y - (1 - f) * 0.08f * size, sc, alpha);
+                place(p.name, x, y, sc, alpha * (1 - Ui.ease(f)));
+            }
             // The name: the old one leaves in the first part of a move and the new one arrives in the last, sliding
             // out from its tile, so two never overlap.
             float a = Ui.ease(Ui.clamp((f - 0.55f) / 0.45f));
@@ -1254,29 +1275,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                 c.drawRoundRect(r, radius, radius, fill);
                 Glyphs.draw(c, "grid", r.centerX(), r.centerY(), r.width() * 0.38f, WHITE);
                 break;
-            case T_INPUT: {
-                boolean off = t.item.kind == Apps.INPUT && !t.item.connected;
-                inputTile(c, r, radius, t.item.label, off, 0);
-                drawInputSymbol(c, t.item, r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? DIM : WHITE);
-                break;
-            }
-            case T_SPEAKER: {
-                Speakers.Speaker sp = t.speaker;
-                boolean off = !sp.connected();
-                inputTile(c, r, radius, t.label, off, sp.active ? GREEN : 0);
-                Glyphs.draw(c, "speaker", r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? DIM : WHITE);
-                break;
-            }
-            case T_REMOTE: {
-                boolean off = remoteDown();
-                inputTile(c, r, radius, t.label, off, remoteColor());
-                Glyphs.draw(c, "phone", r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? DIM : WHITE);
-                break;
-            }
-            case T_ROOM:
-            case T_DEVICE:
-                drawHomeTile(c, t, r, radius);
-                break;
             default:
                 c.drawBitmap(art(t.item), null, r, image);
                 break;
@@ -1284,20 +1282,66 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         fill.setAlpha(255);
     }
 
-    /** An Inputs tab tile: dimmed while there's nothing there, its name at the bottom and a status dot top right. */
-    private void inputTile(Canvas c, RectF r, float radius, String label, boolean off, int dot) {
-        fill.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, off ? 0xB31C1F28 : 0xFF2C313D,
-                off ? 0xB3121419 : 0xFF171A22, Shader.TileMode.CLAMP));
+    /** Tiles with a symbol and their name inside: the inputs, speakers and web remote, the room, lights and plugs. */
+    private static boolean named(Tile t) {
+        return t.kind == T_INPUT || t.kind == T_SPEAKER || t.kind == T_REMOTE || t.kind == T_ROOM || t.kind == T_DEVICE;
+    }
+
+    /** Nothing there: an HDMI port with nothing plugged in, a speaker not connected, the remote down, a plug unreachable. */
+    private boolean dimmed(Tile t) {
+        switch (t.kind) {
+            case T_INPUT: return t.item.kind == Apps.INPUT && !t.item.connected;
+            case T_SPEAKER: return !t.speaker.connected();
+            case T_REMOTE: return remoteDown();
+            case T_DEVICE: return !t.device.online;
+            default: return false;
+        }
+    }
+
+    private boolean lit(Tile t) {
+        return t.kind == T_DEVICE && t.device.on && t.device.online;
+    }
+
+    private int tileInk(Tile t) {
+        return lit(t) && pale(t.device.rgb) ? 0xFF1A1206 : dimmed(t) ? DIM : WHITE;
+    }
+
+    /**
+     * A named tile's ground: a light or plug lit in its colour while it's on, the room lighter, dimmed while there's
+     * nothing there; a speaker or the web remote has a status dot top right.
+     */
+    private void drawTileBack(Canvas c, Tile t, RectF r) {
+        float radius = 18 * k;
+        boolean off = dimmed(t), lit = lit(t);
+        int top = t.kind == T_ROOM ? 0xFF343A48 : lit ? t.device.rgb : off ? 0xB31C1F28 : 0xFF2C313D;
+        int bottom = t.kind == T_ROOM ? 0xFF171A22 : lit ? deep(t.device.rgb, 0.45f) : off ? 0xB3121419 : 0xFF171A22;
+        fill.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, top, bottom, Shader.TileMode.CLAMP));
         c.drawRoundRect(r, radius, radius, fill);
         fill.setShader(null);
+        int dot = t.kind == T_SPEAKER && t.speaker.active ? GREEN : t.kind == T_REMOTE ? remoteColor() : 0;
         if (dot != 0) {
             fill.setColor(dot);
             c.drawCircle(r.right - r.width() * 0.13f, r.top + r.width() * 0.13f, r.width() * 0.045f, fill);
         }
-        // Big enough to read once the row scales the tile down.
-        smallLabel.setTextSize(24 * k);
-        smallLabel.setColor(off ? DIM : 0xE6FFFFFF);
-        c.drawText(fit(label, smallLabel, r.width() - 14 * k), r.centerX(), r.top + r.height() * 0.8f, smallLabel);
+    }
+
+    private void drawTileIcon(Canvas c, Tile t, float cx, float cy, float size) {
+        int ink = tileInk(t);
+        switch (t.kind) {
+            case T_INPUT: drawInputSymbol(c, t.item, cx, cy, size, ink); break;
+            case T_SPEAKER: Glyphs.draw(c, "speaker", cx, cy, size, ink); break;
+            case T_REMOTE: Glyphs.draw(c, "phone", cx, cy, size, ink); break;
+            case T_ROOM: Glyphs.draw(c, "house", cx, cy, size, ink); break;
+            default: Glyphs.draw(c, t.device.icon, cx, cy, size, ink); break;
+        }
+    }
+
+    /** The name inside an unfocused named tile, big enough to read once the row scales the tile down. */
+    private void drawTileName(Canvas c, Tile t, float size) {
+        boolean home = t.kind == T_ROOM || t.kind == T_DEVICE;
+        smallLabel.setTextSize((home ? 22 : 24) * k);
+        smallLabel.setColor(home || dimmed(t) ? tileInk(t) : 0xE6FFFFFF);
+        c.drawText(fit(t.label, smallLabel, size - 14 * k), size / 2, size * 0.8f, smallLabel);
         smallLabel.setTextSize(16 * k);
         smallLabel.setColor(0xCCFFFFFF);
     }
@@ -2569,24 +2613,6 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
 
     private static String kwh(double v) {
         return String.format(Locale.US, v < 0.1 ? "%.3f" : "%.2f", v);
-    }
-
-    /** The tile of the room or of a light or plug: lit in its colour while it's on, dimmed while it can't be reached. */
-    private void drawHomeTile(Canvas c, Tile t, RectF r, float radius) {
-        Devices.Device d = t.device;
-        boolean room = t.kind == T_ROOM, lit = d != null && d.on && d.online, gone = d != null && !d.online;
-        int top = room ? 0xFF343A48 : lit ? d.rgb : gone ? 0xB31C1F28 : 0xFF2C313D;
-        int bottom = room ? 0xFF171A22 : lit ? deep(d.rgb, 0.45f) : gone ? 0xB3121419 : 0xFF171A22;
-        fill.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, top, bottom, Shader.TileMode.CLAMP));
-        c.drawRoundRect(r, radius, radius, fill);
-        fill.setShader(null);
-        int ink = lit && pale(d.rgb) ? 0xFF1A1206 : gone ? 0x80FFFFFF : WHITE;
-        Glyphs.draw(c, room ? "house" : d.icon, r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, ink);
-        smallLabel.setTextSize(22 * k);
-        smallLabel.setColor(ink);
-        c.drawText(fit(t.label, smallLabel, r.width() - 14 * k), r.centerX(), r.top + r.height() * 0.8f, smallLabel);
-        smallLabel.setTextSize(16 * k);
-        smallLabel.setColor(0xCCFFFFFF);
     }
 
     /** The Living room widget: a ring per light and plug, filled with its colour while it's on (OK switches it). */
