@@ -27,6 +27,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.ByteBuffer;
@@ -119,6 +121,9 @@ final class Server {
     private static final Pattern INPUT = Pattern.compile("id=([^,]+), pkg=[^}]*mLabel=(HDMI \\d|AV)");
 
     private final Link link;
+    private final Mdns mdns;
+    private final int port;
+    private final long startedAt = System.currentTimeMillis();
     private final Assets assets;
     private final Consumer<String> log;
     final Auth auth;
@@ -177,9 +182,11 @@ final class Server {
         }
     }
 
-    Server(Context context, Link link, File dataDir, Assets assets, int port, Consumer<String> log) throws IOException {
+    Server(Context context, Link link, Mdns mdns, File dataDir, Assets assets, int port, Consumer<String> log) throws IOException {
         this.context = context;
         this.link = link;
+        this.mdns = mdns;
+        this.port = port;
         version = Long.toString(new File(context.getPackageCodePath()).lastModified(), 36);
         tvInputs = context.getSystemService(TvInputManager.class);
         // An HDMI device switched on or unplugged changes the page's input rings.
@@ -236,6 +243,34 @@ final class Server {
     private void lowPowerStandbyOff() {
         mgmt.run("[ \"$(settings get global " + LOW_POWER_STANDBY + ")\" = 0 ] || settings put global "
                 + LOW_POWER_STANDBY + " 0");
+    }
+
+    private JSONObject health() {
+        Inet4Address a = Mdns.address();
+        return Json.obj("ok", true, "adb", link.up(), "keys", remote.ready, "mdns", mdns.up, "pages", clients.size(),
+                "since", startedAt, "address", a == null ? "" : a.getHostAddress(), "port", port);
+    }
+
+    private static boolean loopback(String ip) {
+        try {
+            return InetAddress.getByName(ip).isLoopbackAddress();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static final Pattern BT_ADDRESS = Pattern.compile("[0-9A-F]{2}(:[0-9A-F]{2}){5}");
+
+    // Connects or disconnects a paired Bluetooth speaker (RemoteProvider, for the home screen). Apps can't: it takes
+    // BLUETOOTH_PRIVILEGED, which the shell has, so BluetoothTool runs as the shell from this APK. Null when done.
+    String bluetooth(String action, String address) {
+        if (!action.equals("connect") && !action.equals("disconnect")) return "Unknown action";
+        if (address == null || !BT_ADDRESS.matcher(address).matches()) return "Bad address";
+        String out = mgmt.run("CLASSPATH=" + quote(context.getPackageCodePath()) + " app_process / "
+                + BluetoothTool.class.getName() + " " + action + " " + address, 10000).trim();
+        if (out.endsWith("ok")) return null;
+        log.accept("bluetooth " + action + ": " + out);
+        return out.isEmpty() ? "Couldn't reach the TV over adb" : "Bluetooth didn't accept that";
     }
 
     private void safeRefreshTick() {
@@ -874,6 +909,11 @@ final class Server {
         if ((!req.method.equals("GET") || p.equals("/ws")) && origin != null
                 && !origin.equals("http://" + req.header("host"))) {
             req.send(403, "text/plain", "forbidden".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        // The home screen's check on this server (Inputs › Web remote); from the TV itself only.
+        if (p.equals("/api/health") && loopback(req.ip)) {
+            json(req, health());
             return;
         }
         try {

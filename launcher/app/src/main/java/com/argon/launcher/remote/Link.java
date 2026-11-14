@@ -46,6 +46,10 @@ final class Link {
         return adb;
     }
 
+    synchronized boolean up() {
+        return adb != null && !adb.closed();
+    }
+
     Adb.Stream open(String service, long timeoutMs) throws InterruptedException {
         Adb a = get(timeoutMs);
         if (a == null) return null;

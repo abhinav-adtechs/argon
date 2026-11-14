@@ -252,6 +252,26 @@ final class Glyphs {
                 c.drawPath(PATH, STROKE);
                 c.drawLine(9.5f, 2.5f, 14.5f, 2.5f, STROKE);
                 break;
+            case "speaker":
+                STROKE.setStrokeWidth(2);
+                c.drawRoundRect(5.5f, 2.5f, 18.5f, 21.5f, 2.5f, 2.5f, STROKE);
+                c.drawCircle(12, 14.5f, 3.6f, STROKE);
+                c.drawCircle(12, 7, 1.3f, FILL);
+                break;
+            case "phone":
+                STROKE.setStrokeWidth(2);
+                c.drawRoundRect(6.5f, 2.5f, 17.5f, 21.5f, 2.5f, 2.5f, STROKE);
+                c.drawLine(10.5f, 18, 13.5f, 18, STROKE);
+                break;
+            case "restart":
+                STROKE.setStrokeWidth(2.2f);
+                R.set(4.5f, 4.5f, 19.5f, 19.5f);
+                c.drawArc(R, -45, 300, false, STROKE);
+                PATH.moveTo(6.9f, 3.3f);
+                PATH.lineTo(10.1f, 4.8f);
+                PATH.lineTo(8.1f, 7.6f);
+                c.drawPath(PATH, STROKE);
+                break;
             default:
                 break;
         }

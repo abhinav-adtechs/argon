@@ -20,6 +20,8 @@ final class Mdns {
     private static final InetAddress GROUP = group();
 
     private MulticastSocket socket;
+    // Joined the group and announced; false while the socket is being rebuilt.
+    volatile boolean up;
 
     // The group has no route until Wi-Fi is the default network: at boot the service starts ~30 s before
     // it, and naps drop it for seconds. Joining fails then ("No such device"), and so can a send, so the
@@ -33,6 +35,7 @@ final class Mdns {
                     socket = s;
                     last = null;
                     announce();
+                    up = true;
                     byte[] buf = new byte[9000];
                     while (true) {
                         DatagramPacket p = new DatagramPacket(buf, buf.length);
@@ -40,6 +43,7 @@ final class Mdns {
                         answer(p);
                     }
                 } catch (IOException e) {
+                    up = false;
                     // Once per outage, not every retry.
                     if (!e.toString().equals(last)) log.accept("mdns: " + e);
                     last = e.toString();

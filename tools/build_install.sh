@@ -15,6 +15,8 @@ adb -s "$TV" install -r app/build/outputs/apk/release/app-release.apk
 # A fresh install runs from the APK until the nightly dexopt; compile it now.
 tv cmd package compile -m speed -f "$PKG"
 tv pm grant "$PKG" android.permission.READ_TV_LISTINGS
+# Inputs › speakers: which paired Bluetooth speakers are connected.
+tv pm grant "$PKG" android.permission.BLUETOOTH_CONNECT
 tv appops set "$PKG" SYSTEM_ALERT_WINDOW allow
 # Viewing stats: usage events for app and screen time, media sessions for what's playing.
 tv appops set "$PKG" GET_USAGE_STATS allow

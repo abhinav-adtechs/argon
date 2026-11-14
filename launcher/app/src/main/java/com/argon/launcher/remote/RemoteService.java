@@ -23,8 +23,10 @@ import java.security.KeyPair;
 // small. HomeActivity starts it; it runs in the foreground so the system keeps it while apps play.
 public class RemoteService extends Service {
     private static final String TAG = "Remote";
-    private static final int PORT = 7777;
+    public static final int PORT = 7777;
     private static boolean started;
+    // For RemoteProvider; null until the server is up.
+    static volatile Server server;
     private WifiManager.MulticastLock multicast;
 
     @Override
@@ -54,8 +56,8 @@ public class RemoteService extends Service {
         SmartHome.get(this);
         try {
             Link link = new Link("127.0.0.1", 5555, key(new File(dir, "adbkey")), "argon@tv", s -> Log.i(TAG, s));
-            new Server(this, link, dir, path -> getAssets().open("remote/" + path), PORT, s -> Log.i(TAG, s));
-            new Mdns(s -> Log.w(TAG, s));
+            Mdns mdns = new Mdns(s -> Log.w(TAG, s));
+            server = new Server(this, link, mdns, dir, path -> getAssets().open("remote/" + path), PORT, s -> Log.i(TAG, s));
             Log.i(TAG, "web remote on http://" + Mdns.NAME + ":" + PORT);
         } catch (IOException | GeneralSecurityException e) {
             Log.e(TAG, "can't start the web remote", e);

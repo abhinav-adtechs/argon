@@ -1,6 +1,7 @@
 package com.argon.launcher;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -26,6 +27,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.argon.launcher.remote.RemoteService;
 import com.argon.launcher.smarthome.Palette;
 
 import java.text.SimpleDateFormat;
@@ -42,6 +44,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,17 +53,20 @@ import java.util.concurrent.Executors;
  * The home screen, in the PS5's Welcome hub style:
  *  - top left, three tabs: Apps, Inputs and Home; top right, Your Viewing and Settings, the weather and the time;
  *  - a row of square tiles (the focused one larger, white-ringed, its name beside it): on Apps, Welcome, the Home
- *    apps and All Apps; on Inputs, Live TV and the HDMI and AV inputs; on Home, the room and its lights and plugs;
+ *    apps and All Apps; on Inputs, Live TV, the HDMI and AV inputs, the speakers and the web remote; on Home, the room
+ *    and its lights and plugs;
  *  - below the row, the focused tile's hub: Welcome shows the widgets (Continue Watching, For You, the match,
  *    today's viewing, the weather, the inputs, shows and movies) on the wallpaper; an app shows its own hub (the
  *    show you're partway through or its top pick as the background, Resume / Open / Options, more from the app);
- *    an input shows its name and state with a Switch button; the room shows its scenes, a light its brightness and
+ *    an input shows its name and state with a Switch button, a speaker whether it's connected and where the sound
+ *    goes, the web remote whether its server is working (with Restart); the room shows its scenes, a light its brightness and
  *    colours (on a glow of its colour), a plug its power;
  *  - All Apps is a library grid; hold OK for Options (Move or Remove a Home app, Add to Home from the library).
  * Measurements are in a 1920×1080 space (k = width / 1920). The screen is split into layers (background, top, hub,
  * library, menu, toast) so the TV's weak GPU only redraws what changed.
  */
-final class HomeView extends ViewGroup implements Choreographer.FrameCallback, Recs.Listener, Weather.Listener, Devices.Listener {
+final class HomeView extends ViewGroup implements Choreographer.FrameCallback, Recs.Listener, Weather.Listener, Devices.Listener,
+        Speakers.Listener, RemoteStatus.Listener {
     interface Host {
         /** Opens it with the system zoom growing out of `from` (screen coordinates). */
         void launch(Intent intent, RectF from);
@@ -92,7 +98,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
     private static final int TAB_APPS = 0, TAB_INPUTS = 1, TAB_HOME = 2, TOP_STATS = 3, TOP_SETTINGS = 4;
     private static final String[] TABS = {"Apps", "Inputs", "Home"};
     private static final int Z_TOP = 0, Z_ROW = 1, Z_HUB = 2;
-    private static final int T_WELCOME = 0, T_APP = 1, T_ALL = 2, T_INPUT = 3, T_ROOM = 4, T_DEVICE = 5;
+    private static final int T_WELCOME = 0, T_APP = 1, T_ALL = 2, T_INPUT = 3, T_ROOM = 4, T_DEVICE = 5, T_SPEAKER = 6,
+            T_REMOTE = 7;
+    private static final int AMBER = 0xFFF2B04A, DIM = 0x80FFFFFF;
     private static final int BG = 0, TOP = 1, HUB = 2, SHEET = 3, MENU = 4, TOAST = 5;
     private static final int LIB_COLUMNS = 8;
     private static final float LIB_TILE = 182, LIB_GAP = 28, LIB_ROW = 262, LIB_TOP = 168;
@@ -109,6 +117,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         String label;
         Apps.Item item;
         Devices.Device device;
+        Speakers.Speaker speaker;
     }
 
     /** Something the focus can land on in the hub; `r` is in hub coordinates (before scrolling). */
@@ -171,6 +180,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
     private int targetIndex, hubKind = -1;
     private Apps.Item hubItem;
     private Devices.Device hubDevice;
+    private Speakers.Speaker hubSpeaker;
     private String hubDeviceId, pendingDevice, rowLook = "";
     private final Spring hubScroll = new Spring(0.26f, 1f, 0);
     // Two hub views: the one in front shows the focused tile's hub, the other the last hub fading away. A new hub is
@@ -203,6 +213,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
     private WatchStats stats;
     private List<Shows.Show> continueShows = new ArrayList<>();
     private final Devices devices;
+    private final Speakers speakers;
+    private final RemoteStatus remoteStatus;
+    // What the Inputs tab's speaker and web remote tiles show; their row is drawn again when it changes.
+    private String inputsLook = "";
 
     // All Apps (the library)
     private boolean sheetOpen;
@@ -306,6 +320,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         artwork = new Artwork(a, this::dataChanged);
         click = new Click(a);
         devices = new Devices(a, this);
+        speakers = new Speakers(a, this);
+        remoteStatus = new RemoteStatus(a, this);
         tvInputs = a.getSystemService(TvInputManager.class);
         setFocusable(true);
         bgLayer = new Layer(a, BG);
@@ -354,6 +370,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         recs.addListener(this);
         weather.addListener(this);
         devices.start();
+        speakers.start();
+        remoteStatus.start();
         recs.refreshIfStale();
         weather.refreshIfStale();
         if (tvInputs != null) tvInputs.registerCallback(inputCallback, handler);
@@ -384,6 +402,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         recs.removeListener(this);
         weather.removeListener(this);
         devices.stop();
+        speakers.stop();
+        remoteStatus.stop();
         if (tvInputs != null) tvInputs.unregisterCallback(inputCallback);
     }
 
@@ -497,6 +517,35 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
 
     @Override public void onDeviceError(String error) {
         showToast(error + ".");
+    }
+
+    /** A speaker connected, the sound moved, or the web remote's server changed: like onDevices, for the Inputs tab. */
+    @Override public void onSpeakers() {
+        inputsChanged();
+    }
+
+    @Override public void onSpeakerError(String error) {
+        showToast(error.endsWith(".") || error.endsWith("?") ? error : error + ".");
+    }
+
+    @Override public void onRemoteStatus() {
+        inputsChanged();
+    }
+
+    private void inputsChanged() {
+        if (tabOn == null) return;
+        String look = inputsLook();
+        if (look.equals(inputsLook)) return;
+        inputsLook = look;
+        if (tab == TAB_INPUTS) buildRow();
+        if (!hubPending && (hubKind == T_SPEAKER || hubKind == T_REMOTE)) layoutHub(false);
+    }
+
+    private String inputsLook() {
+        StringBuilder sb = new StringBuilder().append(speakers.bluetoothOn).append(speakers.elsewhere);
+        for (Speakers.Speaker s : speakers.list) sb.append('|').append(s.address).append(s.name).append(s.state).append(s.active).append(s.busy);
+        RemoteStatus r = remoteStatus;
+        return sb.append('|').append(r.state).append(r.adb).append(r.keys).append(r.mdns).append(r.pages).append(r.since).append(r.address).toString();
     }
 
     private void invalidateAll() {
@@ -935,7 +984,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
 
     // MARK: - The row
 
-    /** The row for the current tab: Welcome, the Home apps and All Apps; or Live TV and the inputs. */
+    /** The row for the current tab: Welcome, the Home apps and All Apps; Live TV, the inputs, the speakers and the web
+     *  remote; or the room and its lights and plugs. */
     private void buildRow() {
         List<Tile> list = new ArrayList<>();
         if (tab == TAB_APPS) {
@@ -962,6 +1012,17 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                 t.label = it.label;
                 list.add(t);
             }
+            for (Speakers.Speaker s : speakers.list) {
+                Tile t = new Tile();
+                t.kind = T_SPEAKER;
+                t.speaker = s;
+                t.label = s.name;
+                list.add(t);
+            }
+            Tile remote = new Tile();
+            remote.kind = T_REMOTE;
+            remote.label = "Web remote";
+            list.add(remote);
         } else {
             Tile room = new Tile();
             room.kind = T_ROOM;
@@ -1195,18 +1256,21 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                 break;
             case T_INPUT: {
                 boolean off = t.item.kind == Apps.INPUT && !t.item.connected;
-                fill.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, off ? 0xB31C1F28 : 0xFF2C313D,
-                        off ? 0xB3121419 : 0xFF171A22, Shader.TileMode.CLAMP));
-                c.drawRoundRect(r, radius, radius, fill);
-                fill.setShader(null);
-                drawInputSymbol(c, t.item, r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? 0x80FFFFFF : WHITE);
-                // Big enough to read once the row scales the tile down.
-                smallLabel.setTextSize(24 * k);
-                smallLabel.setColor(off ? 0x80FFFFFF : 0xE6FFFFFF);
-                String label = fit(t.item.label, smallLabel, r.width() - 14 * k);
-                c.drawText(label, r.centerX(), r.top + r.height() * 0.8f, smallLabel);
-                smallLabel.setTextSize(16 * k);
-                smallLabel.setColor(0xCCFFFFFF);
+                inputTile(c, r, radius, t.item.label, off, 0);
+                drawInputSymbol(c, t.item, r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? DIM : WHITE);
+                break;
+            }
+            case T_SPEAKER: {
+                Speakers.Speaker sp = t.speaker;
+                boolean off = !sp.connected();
+                inputTile(c, r, radius, t.label, off, sp.active ? GREEN : 0);
+                Glyphs.draw(c, "speaker", r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? DIM : WHITE);
+                break;
+            }
+            case T_REMOTE: {
+                boolean off = remoteDown();
+                inputTile(c, r, radius, t.label, off, remoteColor());
+                Glyphs.draw(c, "phone", r.centerX(), r.top + r.height() * 0.42f, r.width() * 0.36f, off ? DIM : WHITE);
                 break;
             }
             case T_ROOM:
@@ -1218,6 +1282,24 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                 break;
         }
         fill.setAlpha(255);
+    }
+
+    /** An Inputs tab tile: dimmed while there's nothing there, its name at the bottom and a status dot top right. */
+    private void inputTile(Canvas c, RectF r, float radius, String label, boolean off, int dot) {
+        fill.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, off ? 0xB31C1F28 : 0xFF2C313D,
+                off ? 0xB3121419 : 0xFF171A22, Shader.TileMode.CLAMP));
+        c.drawRoundRect(r, radius, radius, fill);
+        fill.setShader(null);
+        if (dot != 0) {
+            fill.setColor(dot);
+            c.drawCircle(r.right - r.width() * 0.13f, r.top + r.width() * 0.13f, r.width() * 0.045f, fill);
+        }
+        // Big enough to read once the row scales the tile down.
+        smallLabel.setTextSize(24 * k);
+        smallLabel.setColor(off ? DIM : 0xE6FFFFFF);
+        c.drawText(fit(label, smallLabel, r.width() - 14 * k), r.centerX(), r.top + r.height() * 0.8f, smallLabel);
+        smallLabel.setTextSize(16 * k);
+        smallLabel.setColor(0xCCFFFFFF);
     }
 
     /**
@@ -1457,12 +1539,14 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
         Tile t = row.get(rowIndex);
         boolean changed = t.kind != hubKind || (t.item == null) != (hubItem == null)
                 || (t.item != null && !t.item.key.equals(hubItem.key))
-                || (t.device != null && !t.device.id.equals(hubDeviceId));
+                || (t.device != null && !t.device.id.equals(hubDeviceId))
+                || (t.speaker != null && (hubSpeaker == null || !Objects.equals(t.speaker.address, hubSpeaker.address)));
         int keep = changed ? 0 : targetIndex;
         hubKind = t.kind;
         hubItem = t.item;
         hubDevice = t.device;
         hubDeviceId = t.device == null ? null : t.device.id;
+        hubSpeaker = t.speaker;
         List<Float> was = new ArrayList<>();
         for (Target tg : targets) was.add(tg.focus.value);
         targets.clear();
@@ -1477,6 +1561,8 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
             case T_ALL: layoutButtonHub(this::openSheet); break;
             case T_ROOM: layoutRoomHub(); break;
             case T_DEVICE: layoutDeviceHub(t.device); break;
+            case T_SPEAKER: layoutSpeakerHub(t.speaker); break;
+            case T_REMOTE: homeButton(M, "Restart", !remoteStatus.ok(), remoteStatus::restart); break;
             default: layoutButtonHub(() -> launch(t.item.launch, targets.isEmpty() ? null : hubRect(targets.get(0)))); break;
         }
         targetIndex = Math.max(0, Math.min(keep, targets.size() - 1));
@@ -2112,14 +2198,135 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
     }
 
     private void drawHub(Canvas c) {
-        if (targets.isEmpty() && hubKind != T_WELCOME && hubKind != T_ROOM) return;
+        if (targets.isEmpty() && hubKind != T_WELCOME && hubKind != T_ROOM && hubKind != T_SPEAKER) return;
         switch (hubKind) {
             case T_WELCOME: drawWelcome(c); break;
             case T_APP: drawAppHub(c); break;
             case T_ROOM: drawRoomHub(c); break;
             case T_DEVICE: drawDeviceHub(c); break;
+            case T_SPEAKER: drawSpeakerHub(c); break;
+            case T_REMOTE: drawRemoteHub(c); break;
             default: drawButtonHub(c); break;
         }
+    }
+
+    // MARK: - Inputs: the speakers and the web remote
+
+    /** A speaker's page: Connect or Disconnect (a Bluetooth one), or Use TV speakers while another one has the sound. */
+    private void layoutSpeakerHub(Speakers.Speaker s) {
+        if (s.tv()) {
+            if (!s.active && speakers.active() != null) homeButton(M, "Use TV speakers", true, speakers::useTv);
+        } else if (speakers.bluetoothOn) {
+            homeButton(M, speakerAction(s), true, () -> toggleSpeaker(s));
+        }
+    }
+
+    private static String speakerAction(Speakers.Speaker s) {
+        return s.state == BluetoothProfile.STATE_DISCONNECTED ? "Connect" : "Disconnect";
+    }
+
+    private void toggleSpeaker(Speakers.Speaker s) {
+        if (s.tv()) speakers.useTv();
+        else if (s.state == BluetoothProfile.STATE_DISCONNECTED) speakers.connect(s);
+        else speakers.disconnect(s);
+    }
+
+    private void drawSpeakerHub(Canvas c) {
+        Speakers.Speaker s = hubSpeaker;
+        if (s == null) return;
+        String t1 = fit(s.name, huge, 1500 * k);
+        c.drawText(t1, M * k - Ui.leftBearing(huge, t1), 520 * k, huge);
+        String status;
+        int dot;
+        if (s.tv()) {
+            Speakers.Speaker on = speakers.active();
+            String to = on != null ? on.name : speakers.elsewhere.isEmpty() ? "another output" : speakers.elsewhere;
+            status = s.active ? "Playing the TV's sound" : "Not in use · The sound goes to " + to;
+            dot = s.active ? GREEN : DIM;
+        } else if (!speakers.bluetoothOn) {
+            status = "Bluetooth is off";
+            dot = DIM;
+        } else if (s.busy || s.state == BluetoothProfile.STATE_CONNECTING || s.state == BluetoothProfile.STATE_DISCONNECTING) {
+            boolean leaving = s.state == BluetoothProfile.STATE_DISCONNECTING || (s.busy && s.connected());
+            status = leaving ? "Disconnecting…" : "Connecting…";
+            dot = AMBER;
+        } else if (s.connected()) {
+            status = "Connected · " + (s.active ? "Playing the TV's sound" : "Not in use");
+            dot = GREEN;
+        } else {
+            status = "Not connected";
+            dot = DIM;
+        }
+        statusLine(c, status, dot);
+        if (targets.isEmpty()) return;
+        String label = s.tv() ? "Use TV speakers" : speakerAction(s);
+        drawButton(c, targets.get(0), label.equals("Disconnect") ? "power" : "speaker", label, true);
+    }
+
+    private boolean remoteDown() {
+        return remoteStatus.state == RemoteStatus.NOT_RESPONDING || remoteStatus.state == RemoteStatus.STOPPED;
+    }
+
+    private int remoteColor() {
+        switch (remoteStatus.state) {
+            case RemoteStatus.RUNNING: return GREEN;
+            case RemoteStatus.TROUBLE:
+            case RemoteStatus.RESTARTING: return AMBER;
+            case RemoteStatus.NOT_RESPONDING:
+            case RemoteStatus.STOPPED: return LIVE_RED;
+            default: return 0;
+        }
+    }
+
+    private String remoteLine() {
+        RemoteStatus r = remoteStatus;
+        switch (r.state) {
+            case RemoteStatus.RUNNING:
+                return "Running · http://argon.local:" + RemoteService.PORT
+                        + (r.pages == 0 ? "" : " · " + r.pages + (r.pages == 1 ? " remote open" : " remotes open"));
+            case RemoteStatus.TROUBLE:
+                return "Running, but " + (!r.adb ? "it can't reach the TV over adb" : !r.keys ? "its keys aren't ready"
+                        : "argon.local isn't answering");
+            case RemoteStatus.NOT_RESPONDING: return "Not responding";
+            case RemoteStatus.STOPPED: return "Not running";
+            case RemoteStatus.RESTARTING: return "Restarting…";
+            default: return "Checking…";
+        }
+    }
+
+    /** The web remote's page: how it's doing, Restart, and each part it needs. */
+    private void drawRemoteHub(Canvas c) {
+        RemoteStatus r = remoteStatus;
+        c.drawText("Web remote", M * k - Ui.leftBearing(huge, "Web remote"), 520 * k, huge);
+        statusLine(c, remoteLine(), remoteColor());
+        if (!targets.isEmpty()) drawButton(c, targets.get(0), "restart", "Restart", !r.ok());
+        c.drawText("Status", M * k, 776 * k, sectionTitle);
+        boolean up = r.answering;
+        String server = up ? "Up since " + (day(r.since).equals("Today") ? "" : day(r.since) + ", ") + Ui.time(r.since)
+                : r.state == RemoteStatus.RESTARTING ? "Starting again" : r.state == RemoteStatus.STOPPED
+                ? "Its process isn't running" : r.state == RemoteStatus.NOT_RESPONDING ? "Its process is stuck" : "";
+        check(c, 0, "Server", up ? 1 : r.state == RemoteStatus.CHECKING ? -1 : 0, up ? "Answering" : "Not answering", server);
+        check(c, 1, "TV link", !up ? -1 : r.adb ? 1 : 0, !up ? "–" : r.adb ? "Connected" : "Waiting for adb",
+                "Keys, apps and settings go through it");
+        check(c, 2, "Keys", !up ? -1 : r.keys ? 1 : 0, !up ? "–" : r.keys ? "Ready" : "Not ready", "The remote's virtual keypad");
+        check(c, 3, "argon.local", !up ? -1 : r.mdns ? 1 : 0, !up ? "–" : r.mdns ? "Answering" : "Not answering",
+                r.address.isEmpty() ? "The TV's name on the network" : "The TV at " + r.address + ":" + RemoteService.PORT);
+    }
+
+    /** A status card under the web remote: what it is, a dot and a word for how it's doing (-1: not known), a line. */
+    private void check(Canvas c, int i, String label, int ok, String value, String foot) {
+        float l = (M + i * (400 + COL_GAP)) * k, t = 806 * k;
+        tmp.set(l, t, l + 400 * k, t + 170 * k);
+        fill.setColor(CARD);
+        c.drawRoundRect(tmp, 14 * k, 14 * k, fill);
+        float x = l + 24 * k, base = t + 98 * k;
+        widgetRight.setTextAlign(Paint.Align.LEFT);
+        c.drawText(label, x, t + 42 * k, widgetRight);
+        widgetRight.setTextAlign(Paint.Align.RIGHT);
+        fill.setColor(ok > 0 ? GREEN : ok == 0 ? LIVE_RED : DIM);
+        c.drawCircle(x + 8 * k, base - Ui.halfCap(sectionTitle), 8 * k, fill);
+        c.drawText(fit(value, sectionTitle, 324 * k), x + 28 * k, base, sectionTitle);
+        if (!foot.isEmpty()) c.drawText(fit(foot, cardMeta, 352 * k), x, t + 140 * k, cardMeta);
     }
 
     // MARK: - Home: the room, its lights and plugs
@@ -3236,6 +3443,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                 switch (t.kind) {
                     case T_WELCOME:
                     case T_ROOM:
+                    case T_REMOTE:
                         if (targets.isEmpty()) return;
                         zone = Z_HUB;
                         targetIndex = firstTarget();
@@ -3249,6 +3457,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, R
                     case T_DEVICE:
                         click.open();
                         devices.toggle(t.device);
+                        return;
+                    case T_SPEAKER:
+                        if (t.speaker.tv() && t.speaker.active) return;
+                        click.open();
+                        toggleSpeaker(t.speaker);
                         return;
                     default:
                         click.open();
