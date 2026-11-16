@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Syntax checks (web remote, tools)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Web remote scripts parse
+        run: for f in remote/public/*.js; do node --check "$f"; done
+
+      - name: Web app manifest is valid JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('remote/public/manifest.webmanifest', 'utf8'))"
+
+      - name: Shell scripts parse
+        run: for f in tools/*.sh; do bash -n "$f"; done
+
+      - name: Python tools parse
+        run: python3 -c 'import ast, sys; ast.parse(open(sys.argv[1]).read(), sys.argv[1])' tools/make_symbols.py

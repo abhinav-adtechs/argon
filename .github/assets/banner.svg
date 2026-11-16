@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="Argon — PS5-style launcher and web remote for Google TV">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070a12"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="160" cy="40" r="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4c8dff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#4c8dff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="1180" cy="360" r="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7c5cff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#4c8dff"/>
+    </linearGradient>
+    <linearGradient id="motif" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4c8dff"/>
+      <stop offset="1" stop-color="#7c5cff"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.045"/>
+    </pattern>
+    <clipPath id="card"><rect width="1280" height="360" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#card)">
+    <rect width="1280" height="360" fill="url(#bg)"/>
+    <rect width="1280" height="360" fill="url(#grid)"/>
+    <rect width="1280" height="360" fill="url(#glowA)">
+      <animate attributeName="opacity" values="0.75;1;0.75" dur="7s" repeatCount="indefinite"/>
+    </rect>
+    <rect width="1280" height="360" fill="url(#glowB)"/>
+
+    <!-- MOTIF: a TV with a PS5-style tile row, a phone remote beside it, and faint controller glyphs -->
+    <g id="motif-group" fill="none" stroke="url(#motif)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+      <!-- TV -->
+      <rect x="850" y="62" width="280" height="168" rx="14"/>
+      <path d="M990 230V256M950 258H1030"/>
+      <!-- tabs -->
+      <path d="M872 88H900M914 88H938M952 88H974" stroke="#5b7cff" stroke-opacity="0.7"/>
+      <circle cx="1104" cy="88" r="5" stroke-opacity="0.55"/>
+      <!-- tile row: the focused tile is larger with a ring -->
+      <rect x="872" y="124" width="54" height="54" rx="10" stroke="#ffffff" stroke-opacity="0.95"/>
+      <rect x="878" y="130" width="42" height="42" rx="7" fill="#4c8dff" fill-opacity="0.35" stroke="none"/>
+      <rect x="940" y="132" width="38" height="38" rx="8" stroke-opacity="0.6"/>
+      <rect x="990" y="132" width="38" height="38" rx="8" stroke-opacity="0.5"/>
+      <rect x="1040" y="132" width="38" height="38" rx="8" stroke-opacity="0.4"/>
+      <rect x="1090" y="132" width="26" height="38" rx="8" stroke-opacity="0.3"/>
+      <!-- hub cards -->
+      <path d="M872 202H952M966 202H1030M1044 202H1108" stroke="#6a6cff" stroke-opacity="0.45"/>
+      <!-- Wi-Fi between the TV and the phone -->
+      <path d="M1146 104a14 14 0 0 1 14 -14M1134 104a26 26 0 0 1 26 -26" stroke-opacity="0.7"/>
+      <!-- phone remote -->
+      <rect x="1158" y="112" width="58" height="112" rx="12"/>
+      <circle cx="1187" cy="150" r="17" stroke-opacity="0.85"/>
+      <circle cx="1187" cy="150" r="6" stroke-opacity="0.85"/>
+      <path d="M1172 186l8 8M1180 186l-8 8" stroke-opacity="0.8"/>
+      <circle cx="1201" cy="190" r="5" stroke-opacity="0.8"/>
+      <path d="M1179 210H1195" stroke="#7c5cff" stroke-opacity="0.6"/>
+      <!-- controller glyphs -->
+      <g stroke-opacity="0.45" stroke-width="2.5">
+        <circle cx="880" cy="300" r="10"/>
+        <path d="M922 290l11 20h-22z"/>
+        <path d="M956 291l18 18M974 291l-18 18"/>
+        <rect x="998" y="291" width="18" height="18" rx="2"/>
+      </g>
+    </g>
+  </g>
+
+  <text x="80" y="168" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="80" font-weight="800" letter-spacing="-2" fill="url(#title)">Argon</text>
+  <text x="84" y="220" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" font-weight="500" fill="#cbd5e1">PS5-style launcher + web remote for a debloated Google TV</text>
+
+  <!-- CHIPS: one <g> per chip; width = chars*10.85 + 32; 14px gap between chips -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e2e8f0">
+    <g transform="translate(84 256)">
+      <rect width="108" height="38" rx="19" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.16"/>
+      <text x="16" y="25">Java 17</text>
+    </g>
+    <g transform="translate(206 256)">
+      <rect width="140" height="38" rx="19" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.16"/>
+      <text x="16" y="25">Android 14</text>
+    </g>
+    <g transform="translate(360 256)">
+      <rect width="162" height="38" rx="19" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.16"/>
+      <text x="16" y="25">no libraries</text>
+    </g>
+    <g transform="translate(536 256)">
+      <rect width="206" height="38" rx="19" fill="#ffffff" fill-opacity="0.07" stroke="#ffffff" stroke-opacity="0.16"/>
+      <text x="16" y="25">argon.local:7777</text>
+    </g>
+  </g>
+
+  <rect x="0.5" y="0.5" width="1279" height="359" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.1"/>
+</svg>
